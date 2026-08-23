@@ -3,7 +3,7 @@ import 'package:utanglista_mobileapp/core/config/app_database.dart';
 import 'package:utanglista_mobileapp/features/stores/data/model/store_model.dart';
 import 'package:utanglista_mobileapp/features/stores/data/model/store_payload_model.dart';
 
-abstract class StoresLocalDataSource {
+abstract class StoreLocalDataSource {
   Future<int> createStore(StorePayloadModel payload);
   Future<StoreModel?> fetchStoreById(int storeId);
   Future<List<StoreModel>> fetchStores();
@@ -11,10 +11,10 @@ abstract class StoresLocalDataSource {
   Future<int> deleteStore(int storeId);
 }
 
-class StoresLocalDataSourceImplementation implements StoresLocalDataSource {
+class StoreLocalDataSourceImplementation implements StoreLocalDataSource {
   final AppDatabase database;
 
-  StoresLocalDataSourceImplementation(this.database);
+  StoreLocalDataSourceImplementation(this.database);
 
   // ========================================================
   // ** CONSTANTS FOR TABLE **
