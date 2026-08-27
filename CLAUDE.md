@@ -334,9 +334,9 @@ the one before it.
 
 ## 7. Status
 
-**Phases 0-5 are complete.** `flutter analyze` is clean and 199 tests pass. The
-`transaction_logic.md` §36 worked example now runs end to end — utang, payment, interest,
-and the ledger's running balance column — alongside pure-arithmetic and raw-SQL versions.
+**Phases 0-7 are complete.** `flutter analyze` is clean and 255 tests pass. The
+`transaction_logic.md` §36 worked example runs end to end — utang, payment, interest, and
+the ledger's running-balance column — alongside pure-arithmetic and raw-SQL versions.
 
 - **Phase 0** — schema corrections, `Money`, `CustomerBalance`, shared views, the scanner.
 - **Phase 1** — Stores tab, store form with optional interest, store detail tab shell.
@@ -344,36 +344,51 @@ and the ledger's running balance column — alongside pure-arithmetic and raw-SQ
 - **Phase 3** — Products tab, scan-to-find and scan-to-add, `MoneyTextField`.
 - **Phase 4** — Transaction builder, atomic write, history and read-only detail.
 - **Phase 5** — Payments with the §23 guard, and the §17 ledger.
+- **Phase 6** — Interest preview, idempotent application, and history.
+- **Phase 7** — Dashboard: receivables, top debtors, recent activity, interest nudge.
 
 Rules established along the way that later phases must not relitigate:
 
-- **`CustomerBalance` is the only balance formula** — with ONE deliberate exception: the
-  payment datasource recomputes it inside its own transaction, because a balance read
-  outside the write's transaction can go stale and §23 would then be unenforceable. That
-  exception is documented at both sites and must not be copied elsewhere.
+- **`CustomerBalance` is the only balance formula** — with TWO deliberate exceptions, both
+  documented at their sites: the payment guard and the interest application recompute it
+  inside their own transactions, because a balance read outside the write's transaction
+  goes stale and §23/§21 would then be unenforceable. Nothing else may copy this.
 - **`Money` for every peso amount, `MoneyTextField` for every peso input.**
 - **`InterestRate`** owns the §19 0%-5% range as basis points. Validate via `isValid`.
 - **Multi-record financial writes go in one `database.transaction { }`**, with the
-  referential, balance and total checks INSIDE it (§10, §23, §33).
+  referential, balance and total checks INSIDE it (§10, §23, §33). A BATCH across many
+  customers is many transactions, not one — a partial batch is correct when the failure is
+  §22's guard firing.
 - **Order by `(createdAt, id)`, never `createdAt` alone**; the ledger additionally orders
   by kind (utang → interest → payment) so a same-second pair cannot show a negative
   running balance.
 - **A repository method that validates before awaiting must be `async`**, or the failure
   throws synchronously and never reaches the caller's `.catchError`.
 - **Deactivate, never delete, anything with financial history** (§28, §29, §30). A
-  deactivated customer can still *pay* — §29 stops new utang, not repayment.
+  deactivated customer can still *pay* — §29 stops new utang, not repayment — and is
+  currently skipped by interest (see design_plan Phase 6; a documented judgment call).
 - **An update that changes no column of its own table must not report NOT_FOUND.**
 - **Any list with a search field needs a sequence guard**, not just a debounce.
 - **A scanned barcode has three outcomes, not two:** found-active, found-inactive,
   not-found.
-- **`transaction_items.unitPrice` is a snapshot taken when the line is added** (§7).
-- **Payments and transactions are never edited or deleted** (§14, §30, §31). The absent
-  actions are the rule; both detail screens say so rather than just omitting a button.
+- **Snapshot what a record was computed from.** `transaction_items.unitPrice` (§7) and
+  `interest_records.rateBasisPoints` / `baseAmount` (§21) are both snapshots — repricing a
+  product or changing a store's rate must never rewrite a committed record.
+- **Interest is charged on the balance carried INTO the month**, not the balance now: every
+  event strictly before the period start. A debt taken on 20 August is first charged in
+  September. Charging a past month must use that month's numbers.
+- **An interest charge is dated to the period it covers**, not the wall clock
+  (`AppDateFormat.interestEffectiveDate`). Both compounding and the §17 ledger's chronology
+  depend on it — a charge dated by wall clock falls outside the next month's cutoff and the
+  compounding silently stops.
+- **Financial records are never edited or deleted** (§14, §30, §31). The absent actions are
+  the rule; the detail screens say so rather than just omitting a button.
 
-**Next: Phase 6 (Interest).** The store settings tab already displays the rate; Phase 6
-adds the application job. The unique `(customerId, periodKey)` index already makes §22
-a database guarantee — the work is the preview, the confirmation, and the per-store /
-per-customer interest history.
+**Next: Phase 8 (Polish).** Search and sort on remaining lists, a formatting audit, and
+local backup/restore — still fully offline. Nothing structural is left.
+
+**The app is functionally complete for V1.** Every section of `transaction_logic.md` that
+describes behaviour is implemented and tested.
 
 ### Carried into later phases
 

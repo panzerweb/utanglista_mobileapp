@@ -5,6 +5,12 @@ import 'package:utanglista_mobileapp/features/customers/data/datasource/customer
 import 'package:utanglista_mobileapp/features/customers/domain/repositories/customer_balance_repository.dart';
 import 'package:utanglista_mobileapp/features/customers/domain/repositories/customer_repository.dart';
 import 'package:utanglista_mobileapp/features/customers/presentation/bloc/customer_cubit.dart';
+import 'package:utanglista_mobileapp/features/dashboard/data/datasource/dashboard_local_data_source.dart';
+import 'package:utanglista_mobileapp/features/dashboard/domain/repositories/dashboard_repository.dart';
+import 'package:utanglista_mobileapp/features/dashboard/presentation/bloc/dashboard_cubit.dart';
+import 'package:utanglista_mobileapp/features/interest/data/datasource/interest_local_data_source.dart';
+import 'package:utanglista_mobileapp/features/interest/domain/repositories/interest_repository.dart';
+import 'package:utanglista_mobileapp/features/interest/presentation/bloc/interest_cubit.dart';
 import 'package:utanglista_mobileapp/features/ledger/data/datasource/ledger_local_data_source.dart';
 import 'package:utanglista_mobileapp/features/ledger/domain/repositories/ledger_repository.dart';
 import 'package:utanglista_mobileapp/features/ledger/presentation/bloc/ledger_cubit.dart';
@@ -252,4 +258,52 @@ void setupLocator() {
     (customerId, _) =>
         LedgerCubit(locator<LedgerRepository>(), customerId: customerId),
   );
+
+  // ========================================================
+  // ** INTEREST **
+  // ========================================================
+  locator.registerLazySingleton<InterestLocalDataSource>(
+    () => InterestLocalDataSourceImplementation(locator<AppDatabase>()),
+  );
+
+  locator.registerLazySingleton<InterestRepository>(
+    () => InterestRepositoryImplementation(locator<InterestLocalDataSource>()),
+  );
+
+  locator.registerFactoryParam<InterestHistoryCubit, int, int?>(
+    (storeId, customerId) => InterestHistoryCubit(
+      locator<InterestRepository>(),
+      storeId: storeId,
+      customerId: customerId,
+    ),
+  );
+
+  // ========================================================
+  // ** DASHBOARD **
+  // A read model over every other slice — registered last because it
+  // depends on the balance, store and interest repositories.
+  // ========================================================
+  locator.registerLazySingleton<DashboardLocalDataSource>(
+    () => DashboardLocalDataSourceImplementation(locator<AppDatabase>()),
+  );
+
+  locator.registerLazySingleton<DashboardRepository>(
+    () => DashboardRepositoryImplementation(
+      locator<DashboardLocalDataSource>(),
+      locator<CustomerBalanceRepository>(),
+      locator<StoreRepository>(),
+      locator<InterestRepository>(),
+    ),
+  );
+
+  locator.registerFactory<DashboardCubit>(
+    () => DashboardCubit(locator<DashboardRepository>()),
+  );
+
+  /*
+    ApplyInterestCubit is constructed directly by its screen rather
+    than registered: it needs a store, a rate AND a period, which is
+    one parameter more than registerFactoryParam supports. It resolves
+    its repository through `locator()` in the constructor call.
+  */
 }

@@ -8,13 +8,13 @@ built, in what order, and which decisions are still open.
 
 ## 1. Where the codebase stands today
 
-*Updated at the end of Phase 5.*
+*Updated at the end of Phase 7.*
 
 | Area | Status |
 |---|---|
 | Drift schema (8 tables) | ✅ `schemaVersion: 5`, covered by 23 tests |
 | `Money` / `InterestRate` / `MoneyTextField` | ✅ |
-| `AppDateFormat` (+ `periodKey`) | ✅ |
+| `AppDateFormat` (+ `periodKey`, interest period helpers) | ✅ |
 | `AppFailure` + `repositoryGuard` / `requireRowChanged` | ✅ |
 | Shared state views, snackbar, confirm dialog, scanner | ✅ |
 | `CustomerBalance` + balance repository | ✅ The §15 formula and its queries |
@@ -24,10 +24,11 @@ built, in what order, and which decisions are still open.
 | Transactions slice, builder, history, detail | ✅ Phase 4 |
 | Payments slice + §23 guard | ✅ Phase 5 |
 | Ledger read model (§17) | ✅ Phase 5 |
+| Interest preview / application / history | ✅ Phase 6 |
+| Dashboard read model + screen | ✅ Phase 7 |
 | Routing (all screens on go_router) | ✅ |
 | DI registrations | ✅ All slices wired |
-| Interest application job | ⬜ Phase 6 — table and period guard exist |
-| Dashboard screen | ⬜ Placeholder — Phase 7 |
+| Polish: sorting, backup/export | ⬜ Phase 8 |
 
 **The store slice is the reference implementation.** Every other feature is built by
 copying its shape.
@@ -469,44 +470,123 @@ runs oldest-first and the list is reversed, putting the current balance on the t
 **Not verified:** no widget tests. The concurrency guard is proven at the repository level,
 not through the UI.
 
-### Phase 6 — Interest
+### Phase 6 — Interest ✅ COMPLETE
 
 **Goal:** optional monthly interest, correct and idempotent.
 
-- Store Settings tab: interest on/off, rate slider/field constrained to **0–5%**,
-  rejected outside that range at both the form and the repository (§19)
-- `ApplyMonthlyInterest` use case:
-  - runs per store, for every active customer with a positive balance
-  - computes `base = current balance`, `interest = round(base × rate)`
-  - writes an interest record carrying `customerId`, `rate`, `baseAmount`,
-    `interestAmount`, `periodKey`, `createdAt` (§21)
-  - the unique `(customerId, periodKey)` index makes a second run for the same month a
-    no-op, not a duplicate (§22)
-- **Trigger:** manual "Apply interest for <month>" action in Store Settings for V1, with a
-  preview of who is affected and by how much before confirming. An automatic on-open check
-  can follow once the manual path is proven — the period key makes it safe either way.
-- Interest history list per store and per customer
-- When interest is disabled, no records are ever generated and the ledger simply has no
-  interest rows
+- [x] Interest slice — preview, apply, history
+- [x] `ApplyInterestScreen` — month stepper, per-customer preview, confirmation naming
+      the exact figures, result reporting
+- [x] Every customer listed with a STATUS, charged or skipped, and why
+- [x] §22 idempotency: a second run for the same month charges nothing
+- [x] §21: base amount and rate recorded WITH each charge, so a later rate change cannot
+      rewrite what was already applied
+- [x] `InterestHistoryScreen` — per store and per customer, grouped by month
+- [x] Store Settings tab gains "Charge N% monthly interest" and "Interest history",
+      shown only when interest is actually configured
+
+**Done:** `flutter analyze` clean, 228/228 tests pass, debug APK builds.
+
+**One transaction per customer, not one for the batch.** §33 describes applying interest
+as its own BEGIN/COMMIT, and that is per customer for a reason: wrapping fifty customers in
+one transaction means the fiftieth failing undoes the other forty-nine — and the most
+likely failure is §22's unique index firing because that customer was already charged. A
+partial batch is the *correct* outcome there. The run reports what it charged and what it
+could not, rather than throwing.
 
 ---
 
-### Phase 7 — Dashboard
+#### ⚠ Corrected after review: WHEN interest starts
 
-**Goal:** the at-a-glance screen the workflow asks for.
+The first implementation charged 2% of the balance **right now**, which had two problems:
 
-- **Total receivable** across all stores, and per store
-- **Store summary cards** — customer count, outstanding total, tap → store detail
-- **Top debtors** — highest outstanding balances, tap → customer detail
-- **Recent activity** — latest transactions and payments across stores
-- **Interest due** — a nudge when a store has interest enabled and this month has not been
-  applied
-- Quick actions: new transaction, record payment, add customer
+1. **A real bug.** The month stepper lets you charge a past month, but the base ignored
+   dates entirely — stepping back to charge August while in September computed 2% of the
+   *September* balance and labelled it August.
+2. **A debt taken on 20 August was charged for August**, as though it had been outstanding
+   all month.
 
-All figures come from `BalanceCalculator` and its aggregate queries — the dashboard adds
-no second definition of "balance".
+**Decided:** the base is the balance the customer carried **into** the month — every
+financial event strictly before the period start. A debt taken on 20 August is therefore
+first charged in **September**, roughly a month after it was created.
+
+*Why not true per-debt accrual?* Charging each transaction from its own date requires
+knowing how much of each one is still unpaid, and §11/§13 explicitly forbid allocating
+payments to transactions. Per-debt interest would need FIFO allocation and a rewrite of two
+sections of `transaction_logic.md`. Period-start basing gets the same practical behaviour
+without touching the payment model.
+
+**Decided:** interest **compounds** — a month's base includes prior interest charges.
+
+That decision forced a second one. A charge is **dated to the period it covers**, not to
+the wall clock (`AppDateFormat.interestEffectiveDate`, clamped so the current month is
+never future-dated). Without it, running August's charge on 1 September would date it
+September, and it would fall outside September's own cutoff — the compounding the store
+expects would silently not happen. It also keeps §17's ledger chronology honest: an August
+charge surfacing in late September reads as a double charge.
 
 ---
+
+**Three skip reasons the seller sees**, rather than customers silently vanishing from the
+list: already charged this month, owed nothing entering the month (which covers both a
+settled account *and* a debt taken during the month), and interest rounds to ₱0.00.
+
+**The base is recomputed inside each transaction, not taken from the preview.** The preview
+may be minutes old by the time the seller confirms, and §21 requires the recorded base to be
+the balance the charge was actually computed from.
+
+**Manual, not automatic — a deliberate choice.** The `(customerId, periodKey)` unique index
+makes an automatic trigger *safe*; it is manual anyway because §21 makes each charge
+permanent and V1 has no reversal.
+
+**⚠ A judgment call, not a spec rule: deactivated customers are SKIPPED.** §29 says an
+inactive customer "cannot normally receive new transactions" and "retains their financial
+history" — interest is neither exactly. This implementation skips them, on the reasoning
+that deactivating someone is the seller's signal to stop the relationship growing. It is the
+reversible choice: reactivate the customer to charge them. **If the business rule is the
+opposite, `InterestPreviewStatus.inactive` in `interest_local_data_source.dart` is the one
+place to change it.**
+
+**Not verified:** no widget tests. The month stepper and confirmation flow are covered by
+logic tests and a build only.
+
+### Phase 7 — Dashboard ✅ COMPLETE
+
+**Goal:** the at-a-glance screen.
+
+- [x] **Total receivable** across all stores, with the §15 breakdown beneath it
+- [x] **Store rows** — customer count, how many owe, outstanding, tap → store detail
+- [x] **Top debtors** across every store, ranked by outstanding, tap → customer detail
+- [x] **Recent activity** — latest utang and payments across stores, tap → the record
+- [x] **Interest nudge** when a store has this month's interest still to charge
+- [x] Empty state that offers to create the first store
+
+**Done:** `flutter analyze` clean, 255/255 tests pass, debug APK builds.
+
+Ordered by what a seller opens the app to find out: how much am I owed → is there anything
+I need to do → who owes the most → what happened recently → which store is which.
+
+**The dashboard adds no arithmetic of its own.** The headline comes from
+`CustomerBalanceRepository.fetchTotalForAllStores()`, not a fourth SUM — this is the screen
+where a disagreement would actually be visible, and the seller would have no way to tell
+which number was lying. A test asserts the headline equals both the sum of the per-store
+figures and what `CustomerBalanceRepository` reports directly.
+
+**The interest nudge runs the real preview**, per store, rather than a lookalike "has this
+month got records?" check. Two reasons: it cannot drift from what the interest screen would
+actually do, and after Phase 6's correction it correctly stays *off* when the only debt was
+taken this month — tapping through would otherwise show "nothing to charge". One query per
+store with interest enabled, none for a seller who never turned it on. A failure there is
+swallowed: a hint that cannot be computed should not take the dashboard down.
+
+**Three queries, all fan-out-safe.** Store summaries, top debtors and recent activity each
+pre-aggregate before joining, the same shape the balance query uses. A test puts two
+transactions and three payments on one customer and asserts nothing multiplies.
+
+**Interest is left out of recent activity** on purpose — it arrives as a monthly batch that
+would swamp the feed, and it is already visible on the store that charged it.
+
+**Not verified:** no widget tests.
 
 ### Phase 8 — Polish
 

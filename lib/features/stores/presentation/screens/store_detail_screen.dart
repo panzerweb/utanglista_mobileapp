@@ -351,6 +351,59 @@ class _SettingsTab extends StatelessWidget {
 
             const SizedBox(height: 20),
 
+            /*
+              Interest actions live here rather than on a tab of their
+              own: charging it is a monthly chore tied to the store's
+              settings, not a place the seller browses.
+
+              Only shown when interest is actually configured (§19 —
+              it is optional, and enabled-at-0% charges nothing).
+            */
+            if (store.chargesInterest) ...[
+              FilledButton.icon(
+                onPressed: () => context.push(
+                  AppRoutes.applyInterest(store.id),
+                  extra: ApplyInterestRequest(
+                    rate: store.monthlyInterestRate,
+                  ),
+                ),
+                icon: const Icon(Icons.percent_rounded, size: 20),
+                label: Text(
+                  'Charge ${store.monthlyInterestRate.formatPercent()} '
+                  'monthly interest',
+                ),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppPalette.warning,
+                  foregroundColor: AppPalette.surface,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  minimumSize: const Size.fromHeight(48),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 10),
+
+              OutlinedButton.icon(
+                onPressed: () =>
+                    context.push(AppRoutes.interestHistory(store.id)),
+                icon: const Icon(Icons.history_rounded, size: 20),
+                label: const Text('Interest history'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppPalette.textSecondary,
+                  side: const BorderSide(color: AppPalette.border),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  minimumSize: const Size.fromHeight(48),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 10),
+            ],
+
             OutlinedButton.icon(
               onPressed: () => context.push(AppRoutes.editStore(store.id)),
               icon: const Icon(Icons.edit_outlined, size: 20),

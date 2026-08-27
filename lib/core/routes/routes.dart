@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:utanglista_mobileapp/core/money/interest_rate.dart';
 import 'package:utanglista_mobileapp/core/shared/app_view.dart';
 import 'package:utanglista_mobileapp/core/shared/scanner/barcode_scanner_screen.dart';
 import 'package:utanglista_mobileapp/features/customers/presentation/screens/customer_detail_screen.dart';
 import 'package:utanglista_mobileapp/features/customers/presentation/screens/customer_form_screen.dart';
-import 'package:utanglista_mobileapp/features/dashboard_screen.dart';
+import 'package:utanglista_mobileapp/features/dashboard/presentation/screens/dashboard_screen.dart';
 import 'package:utanglista_mobileapp/features/payments/presentation/screens/record_payment_screen.dart';
 import 'package:utanglista_mobileapp/features/products/presentation/screens/product_form_screen.dart';
 import 'package:utanglista_mobileapp/features/home_screen.dart';
+import 'package:utanglista_mobileapp/features/interest/presentation/screens/apply_interest_screen.dart';
+import 'package:utanglista_mobileapp/features/interest/presentation/screens/interest_history_screen.dart';
 import 'package:utanglista_mobileapp/features/stores/presentation/screens/store_detail_screen.dart';
 import 'package:utanglista_mobileapp/features/transactions/presentation/screens/transaction_builder_screen.dart';
 import 'package:utanglista_mobileapp/features/transactions/presentation/screens/transaction_detail_screen.dart';
@@ -97,6 +100,14 @@ abstract final class AppRoutes {
 
   static String newPayment(int storeId, int customerId) =>
       '/stores/$storeId/customers/$customerId/payments/new';
+
+  static String applyInterest(int storeId) =>
+      '/stores/$storeId/interest/apply';
+
+  static String interestHistory(int storeId, {int? customerId}) =>
+      customerId == null
+      ? '/stores/$storeId/interest'
+      : '/stores/$storeId/interest?customerId=$customerId';
 }
 
 final router = GoRouter(
@@ -141,7 +152,7 @@ final router = GoRouter(
             GoRoute(
               path: AppRoutes.dashboard,
               builder: (context, state) {
-                return DashboardScreen();
+                return const DashboardScreen();
               },
             ),
           ],
@@ -218,6 +229,57 @@ final router = GoRouter(
                       order, so the reverse would parse "new" as a
                       customer id.
                     */
+                    /*
+                      Interest is applied per STORE, from its settings
+                      tab — the rate belongs to the store, and the run
+                      covers every customer in it.
+                    */
+                    GoRoute(
+                      path: 'interest/apply',
+                      parentNavigatorKey: _routerKey,
+                      builder: (context, state) {
+                        final storeId = int.tryParse(
+                          state.pathParameters['storeId'] ?? '',
+                        );
+                        final request = state.extra as ApplyInterestRequest?;
+
+                        if (storeId == null || request == null) {
+                          return const _InvalidRouteScreen(
+                            message: 'That interest link is not valid.',
+                          );
+                        }
+
+                        return ApplyInterestScreen(
+                          storeId: storeId,
+                          rate: request.rate,
+                        );
+                      },
+                    ),
+                    GoRoute(
+                      path: 'interest',
+                      parentNavigatorKey: _routerKey,
+                      builder: (context, state) {
+                        final storeId = int.tryParse(
+                          state.pathParameters['storeId'] ?? '',
+                        );
+
+                        if (storeId == null) {
+                          return const _InvalidRouteScreen(
+                            message: 'That store link is not valid.',
+                          );
+                        }
+
+                        final customerId = int.tryParse(
+                          state.uri.queryParameters['customerId'] ?? '',
+                        );
+
+                        return InterestHistoryScreen(
+                          storeId: storeId,
+                          customerId: customerId,
+                        );
+                      },
+                    ),
+
                     /*
                       Full-screen: recording money received deserves
                       the same focus as building a cart.
@@ -457,6 +519,19 @@ class RecordPaymentRequest {
   final String? customerName;
 
   const RecordPaymentRequest({this.customerName});
+}
+
+/*
+  Carries the store's rate into the interest screen.
+
+  Passed rather than re-read so the screen charges the rate the seller
+  was just looking at in settings — §21 snapshots it onto every record
+  it produces, so which rate is used is not a detail.
+*/
+class ApplyInterestRequest {
+  final InterestRate rate;
+
+  const ApplyInterestRequest({required this.rate});
 }
 
 /*
