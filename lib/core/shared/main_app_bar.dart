@@ -18,7 +18,6 @@
 */
 
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:utanglista_mobileapp/core/styles/app_palette.dart';
 import 'package:utanglista_mobileapp/core/styles/app_text_styles.dart';
 

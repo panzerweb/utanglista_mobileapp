@@ -29,8 +29,8 @@ class $StoresTableTable extends StoresTable
     aliasedName,
     false,
     additionalChecks: GeneratedColumn.checkTextLength(
-      minTextLength: 6,
-      maxTextLength: 32,
+      minTextLength: 2,
+      maxTextLength: 60,
     ),
     type: DriftSqlType.string,
     requiredDuringInsert: true,
@@ -64,9 +64,10 @@ class $StoresTableTable extends StoresTable
   late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
     'created_at',
     aliasedName,
-    true,
+    false,
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
+    clientDefault: DateTime.now,
   );
   @override
   List<GeneratedColumn> get $columns => [
@@ -148,7 +149,7 @@ class $StoresTableTable extends StoresTable
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
-      ),
+      )!,
     );
   }
 
@@ -163,13 +164,13 @@ class StoresTableData extends DataClass implements Insertable<StoresTableData> {
   final String name;
   final String? description;
   final String? category;
-  final DateTime? createdAt;
+  final DateTime createdAt;
   const StoresTableData({
     required this.id,
     required this.name,
     this.description,
     this.category,
-    this.createdAt,
+    required this.createdAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -182,9 +183,7 @@ class StoresTableData extends DataClass implements Insertable<StoresTableData> {
     if (!nullToAbsent || category != null) {
       map['category'] = Variable<String>(category);
     }
-    if (!nullToAbsent || createdAt != null) {
-      map['created_at'] = Variable<DateTime>(createdAt);
-    }
+    map['created_at'] = Variable<DateTime>(createdAt);
     return map;
   }
 
@@ -198,9 +197,7 @@ class StoresTableData extends DataClass implements Insertable<StoresTableData> {
       category: category == null && nullToAbsent
           ? const Value.absent()
           : Value(category),
-      createdAt: createdAt == null && nullToAbsent
-          ? const Value.absent()
-          : Value(createdAt),
+      createdAt: Value(createdAt),
     );
   }
 
@@ -214,7 +211,7 @@ class StoresTableData extends DataClass implements Insertable<StoresTableData> {
       name: serializer.fromJson<String>(json['name']),
       description: serializer.fromJson<String?>(json['description']),
       category: serializer.fromJson<String?>(json['category']),
-      createdAt: serializer.fromJson<DateTime?>(json['createdAt']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
   @override
@@ -225,7 +222,7 @@ class StoresTableData extends DataClass implements Insertable<StoresTableData> {
       'name': serializer.toJson<String>(name),
       'description': serializer.toJson<String?>(description),
       'category': serializer.toJson<String?>(category),
-      'createdAt': serializer.toJson<DateTime?>(createdAt),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
 
@@ -234,13 +231,13 @@ class StoresTableData extends DataClass implements Insertable<StoresTableData> {
     String? name,
     Value<String?> description = const Value.absent(),
     Value<String?> category = const Value.absent(),
-    Value<DateTime?> createdAt = const Value.absent(),
+    DateTime? createdAt,
   }) => StoresTableData(
     id: id ?? this.id,
     name: name ?? this.name,
     description: description.present ? description.value : this.description,
     category: category.present ? category.value : this.category,
-    createdAt: createdAt.present ? createdAt.value : this.createdAt,
+    createdAt: createdAt ?? this.createdAt,
   );
   StoresTableData copyWithCompanion(StoresTableCompanion data) {
     return StoresTableData(
@@ -284,7 +281,7 @@ class StoresTableCompanion extends UpdateCompanion<StoresTableData> {
   final Value<String> name;
   final Value<String?> description;
   final Value<String?> category;
-  final Value<DateTime?> createdAt;
+  final Value<DateTime> createdAt;
   const StoresTableCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
@@ -320,7 +317,7 @@ class StoresTableCompanion extends UpdateCompanion<StoresTableData> {
     Value<String>? name,
     Value<String?>? description,
     Value<String?>? category,
-    Value<DateTime?>? createdAt,
+    Value<DateTime>? createdAt,
   }) {
     return StoresTableCompanion(
       id: id ?? this.id,
@@ -405,8 +402,8 @@ class $CustomersTableTable extends CustomersTable
     aliasedName,
     false,
     additionalChecks: GeneratedColumn.checkTextLength(
-      minTextLength: 6,
-      maxTextLength: 32,
+      minTextLength: 2,
+      maxTextLength: 60,
     ),
     type: DriftSqlType.string,
     requiredDuringInsert: true,
@@ -418,10 +415,10 @@ class $CustomersTableTable extends CustomersTable
   late final GeneratedColumn<String> contactNumber = GeneratedColumn<String>(
     'contact_number',
     aliasedName,
-    false,
-    additionalChecks: GeneratedColumn.checkTextLength(maxTextLength: 12),
+    true,
+    additionalChecks: GeneratedColumn.checkTextLength(maxTextLength: 20),
     type: DriftSqlType.string,
-    requiredDuringInsert: true,
+    requiredDuringInsert: false,
   );
   static const VerificationMeta _isActiveMeta = const VerificationMeta(
     'isActive',
@@ -432,10 +429,11 @@ class $CustomersTableTable extends CustomersTable
     aliasedName,
     false,
     type: DriftSqlType.bool,
-    requiredDuringInsert: true,
+    requiredDuringInsert: false,
     defaultConstraints: GeneratedColumn.constraintIsAlways(
       'CHECK ("is_active" IN (0, 1))',
     ),
+    defaultValue: const Constant(true),
   );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
@@ -444,9 +442,10 @@ class $CustomersTableTable extends CustomersTable
   late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
     'created_at',
     aliasedName,
-    true,
+    false,
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
+    clientDefault: DateTime.now,
   );
   @override
   List<GeneratedColumn> get $columns => [
@@ -496,16 +495,12 @@ class $CustomersTableTable extends CustomersTable
           _contactNumberMeta,
         ),
       );
-    } else if (isInserting) {
-      context.missing(_contactNumberMeta);
     }
     if (data.containsKey('is_active')) {
       context.handle(
         _isActiveMeta,
         isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta),
       );
-    } else if (isInserting) {
-      context.missing(_isActiveMeta);
     }
     if (data.containsKey('created_at')) {
       context.handle(
@@ -537,7 +532,7 @@ class $CustomersTableTable extends CustomersTable
       contactNumber: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}contact_number'],
-      )!,
+      ),
       isActive: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_active'],
@@ -545,7 +540,7 @@ class $CustomersTableTable extends CustomersTable
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
-      ),
+      )!,
     );
   }
 
@@ -560,16 +555,16 @@ class CustomersTableData extends DataClass
   final int id;
   final int storeId;
   final String name;
-  final String contactNumber;
+  final String? contactNumber;
   final bool isActive;
-  final DateTime? createdAt;
+  final DateTime createdAt;
   const CustomersTableData({
     required this.id,
     required this.storeId,
     required this.name,
-    required this.contactNumber,
+    this.contactNumber,
     required this.isActive,
-    this.createdAt,
+    required this.createdAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -577,11 +572,11 @@ class CustomersTableData extends DataClass
     map['id'] = Variable<int>(id);
     map['store_id'] = Variable<int>(storeId);
     map['name'] = Variable<String>(name);
-    map['contact_number'] = Variable<String>(contactNumber);
-    map['is_active'] = Variable<bool>(isActive);
-    if (!nullToAbsent || createdAt != null) {
-      map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || contactNumber != null) {
+      map['contact_number'] = Variable<String>(contactNumber);
     }
+    map['is_active'] = Variable<bool>(isActive);
+    map['created_at'] = Variable<DateTime>(createdAt);
     return map;
   }
 
@@ -590,11 +585,11 @@ class CustomersTableData extends DataClass
       id: Value(id),
       storeId: Value(storeId),
       name: Value(name),
-      contactNumber: Value(contactNumber),
-      isActive: Value(isActive),
-      createdAt: createdAt == null && nullToAbsent
+      contactNumber: contactNumber == null && nullToAbsent
           ? const Value.absent()
-          : Value(createdAt),
+          : Value(contactNumber),
+      isActive: Value(isActive),
+      createdAt: Value(createdAt),
     );
   }
 
@@ -607,9 +602,9 @@ class CustomersTableData extends DataClass
       id: serializer.fromJson<int>(json['id']),
       storeId: serializer.fromJson<int>(json['storeId']),
       name: serializer.fromJson<String>(json['name']),
-      contactNumber: serializer.fromJson<String>(json['contactNumber']),
+      contactNumber: serializer.fromJson<String?>(json['contactNumber']),
       isActive: serializer.fromJson<bool>(json['isActive']),
-      createdAt: serializer.fromJson<DateTime?>(json['createdAt']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
   @override
@@ -619,9 +614,9 @@ class CustomersTableData extends DataClass
       'id': serializer.toJson<int>(id),
       'storeId': serializer.toJson<int>(storeId),
       'name': serializer.toJson<String>(name),
-      'contactNumber': serializer.toJson<String>(contactNumber),
+      'contactNumber': serializer.toJson<String?>(contactNumber),
       'isActive': serializer.toJson<bool>(isActive),
-      'createdAt': serializer.toJson<DateTime?>(createdAt),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
 
@@ -629,16 +624,18 @@ class CustomersTableData extends DataClass
     int? id,
     int? storeId,
     String? name,
-    String? contactNumber,
+    Value<String?> contactNumber = const Value.absent(),
     bool? isActive,
-    Value<DateTime?> createdAt = const Value.absent(),
+    DateTime? createdAt,
   }) => CustomersTableData(
     id: id ?? this.id,
     storeId: storeId ?? this.storeId,
     name: name ?? this.name,
-    contactNumber: contactNumber ?? this.contactNumber,
+    contactNumber: contactNumber.present
+        ? contactNumber.value
+        : this.contactNumber,
     isActive: isActive ?? this.isActive,
-    createdAt: createdAt.present ? createdAt.value : this.createdAt,
+    createdAt: createdAt ?? this.createdAt,
   );
   CustomersTableData copyWithCompanion(CustomersTableCompanion data) {
     return CustomersTableData(
@@ -685,9 +682,9 @@ class CustomersTableCompanion extends UpdateCompanion<CustomersTableData> {
   final Value<int> id;
   final Value<int> storeId;
   final Value<String> name;
-  final Value<String> contactNumber;
+  final Value<String?> contactNumber;
   final Value<bool> isActive;
-  final Value<DateTime?> createdAt;
+  final Value<DateTime> createdAt;
   const CustomersTableCompanion({
     this.id = const Value.absent(),
     this.storeId = const Value.absent(),
@@ -700,13 +697,11 @@ class CustomersTableCompanion extends UpdateCompanion<CustomersTableData> {
     this.id = const Value.absent(),
     required int storeId,
     required String name,
-    required String contactNumber,
-    required bool isActive,
+    this.contactNumber = const Value.absent(),
+    this.isActive = const Value.absent(),
     this.createdAt = const Value.absent(),
   }) : storeId = Value(storeId),
-       name = Value(name),
-       contactNumber = Value(contactNumber),
-       isActive = Value(isActive);
+       name = Value(name);
   static Insertable<CustomersTableData> custom({
     Expression<int>? id,
     Expression<int>? storeId,
@@ -729,9 +724,9 @@ class CustomersTableCompanion extends UpdateCompanion<CustomersTableData> {
     Value<int>? id,
     Value<int>? storeId,
     Value<String>? name,
-    Value<String>? contactNumber,
+    Value<String?>? contactNumber,
     Value<bool>? isActive,
-    Value<DateTime?>? createdAt,
+    Value<DateTime>? createdAt,
   }) {
     return CustomersTableCompanion(
       id: id ?? this.id,
@@ -814,6 +809,17 @@ class $ProductsTableTable extends ProductsTable
       'REFERENCES stores_table (id) ON DELETE CASCADE',
     ),
   );
+  static const VerificationMeta _barcodeMeta = const VerificationMeta(
+    'barcode',
+  );
+  @override
+  late final GeneratedColumn<String> barcode = GeneratedColumn<String>(
+    'barcode',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _nameMeta = const VerificationMeta('name');
   @override
   late final GeneratedColumn<String> name = GeneratedColumn<String>(
@@ -821,8 +827,8 @@ class $ProductsTableTable extends ProductsTable
     aliasedName,
     false,
     additionalChecks: GeneratedColumn.checkTextLength(
-      minTextLength: 6,
-      maxTextLength: 32,
+      minTextLength: 2,
+      maxTextLength: 60,
     ),
     type: DriftSqlType.string,
     requiredDuringInsert: true,
@@ -840,13 +846,12 @@ class $ProductsTableTable extends ProductsTable
   );
   static const VerificationMeta _priceMeta = const VerificationMeta('price');
   @override
-  late final GeneratedColumn<double> price = GeneratedColumn<double>(
+  late final GeneratedColumn<int> price = GeneratedColumn<int>(
     'price',
     aliasedName,
     false,
-    type: DriftSqlType.double,
-    requiredDuringInsert: false,
-    clientDefault: () => 0.0,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
   );
   static const VerificationMeta _unitMeta = const VerificationMeta('unit');
   @override
@@ -866,10 +871,11 @@ class $ProductsTableTable extends ProductsTable
     aliasedName,
     false,
     type: DriftSqlType.bool,
-    requiredDuringInsert: true,
+    requiredDuringInsert: false,
     defaultConstraints: GeneratedColumn.constraintIsAlways(
       'CHECK ("is_active" IN (0, 1))',
     ),
+    defaultValue: const Constant(true),
   );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
@@ -878,14 +884,16 @@ class $ProductsTableTable extends ProductsTable
   late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
     'created_at',
     aliasedName,
-    true,
+    false,
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
+    clientDefault: DateTime.now,
   );
   @override
   List<GeneratedColumn> get $columns => [
     id,
     storeId,
+    barcode,
     name,
     description,
     price,
@@ -916,6 +924,12 @@ class $ProductsTableTable extends ProductsTable
     } else if (isInserting) {
       context.missing(_storeIdMeta);
     }
+    if (data.containsKey('barcode')) {
+      context.handle(
+        _barcodeMeta,
+        barcode.isAcceptableOrUnknown(data['barcode']!, _barcodeMeta),
+      );
+    }
     if (data.containsKey('name')) {
       context.handle(
         _nameMeta,
@@ -938,6 +952,8 @@ class $ProductsTableTable extends ProductsTable
         _priceMeta,
         price.isAcceptableOrUnknown(data['price']!, _priceMeta),
       );
+    } else if (isInserting) {
+      context.missing(_priceMeta);
     }
     if (data.containsKey('unit')) {
       context.handle(
@@ -952,8 +968,6 @@ class $ProductsTableTable extends ProductsTable
         _isActiveMeta,
         isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta),
       );
-    } else if (isInserting) {
-      context.missing(_isActiveMeta);
     }
     if (data.containsKey('created_at')) {
       context.handle(
@@ -978,6 +992,10 @@ class $ProductsTableTable extends ProductsTable
         DriftSqlType.int,
         data['${effectivePrefix}store_id'],
       )!,
+      barcode: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}barcode'],
+      ),
       name: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}name'],
@@ -987,7 +1005,7 @@ class $ProductsTableTable extends ProductsTable
         data['${effectivePrefix}description'],
       ),
       price: attachedDatabase.typeMapping.read(
-        DriftSqlType.double,
+        DriftSqlType.int,
         data['${effectivePrefix}price'],
       )!,
       unit: attachedDatabase.typeMapping.read(
@@ -1001,7 +1019,7 @@ class $ProductsTableTable extends ProductsTable
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
-      ),
+      )!,
     );
   }
 
@@ -1015,37 +1033,40 @@ class ProductsTableData extends DataClass
     implements Insertable<ProductsTableData> {
   final int id;
   final int storeId;
+  final String? barcode;
   final String name;
   final String? description;
-  final double price;
+  final int price;
   final String unit;
   final bool isActive;
-  final DateTime? createdAt;
+  final DateTime createdAt;
   const ProductsTableData({
     required this.id,
     required this.storeId,
+    this.barcode,
     required this.name,
     this.description,
     required this.price,
     required this.unit,
     required this.isActive,
-    this.createdAt,
+    required this.createdAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
     map['store_id'] = Variable<int>(storeId);
+    if (!nullToAbsent || barcode != null) {
+      map['barcode'] = Variable<String>(barcode);
+    }
     map['name'] = Variable<String>(name);
     if (!nullToAbsent || description != null) {
       map['description'] = Variable<String>(description);
     }
-    map['price'] = Variable<double>(price);
+    map['price'] = Variable<int>(price);
     map['unit'] = Variable<String>(unit);
     map['is_active'] = Variable<bool>(isActive);
-    if (!nullToAbsent || createdAt != null) {
-      map['created_at'] = Variable<DateTime>(createdAt);
-    }
+    map['created_at'] = Variable<DateTime>(createdAt);
     return map;
   }
 
@@ -1053,6 +1074,9 @@ class ProductsTableData extends DataClass
     return ProductsTableCompanion(
       id: Value(id),
       storeId: Value(storeId),
+      barcode: barcode == null && nullToAbsent
+          ? const Value.absent()
+          : Value(barcode),
       name: Value(name),
       description: description == null && nullToAbsent
           ? const Value.absent()
@@ -1060,9 +1084,7 @@ class ProductsTableData extends DataClass
       price: Value(price),
       unit: Value(unit),
       isActive: Value(isActive),
-      createdAt: createdAt == null && nullToAbsent
-          ? const Value.absent()
-          : Value(createdAt),
+      createdAt: Value(createdAt),
     );
   }
 
@@ -1074,12 +1096,13 @@ class ProductsTableData extends DataClass
     return ProductsTableData(
       id: serializer.fromJson<int>(json['id']),
       storeId: serializer.fromJson<int>(json['storeId']),
+      barcode: serializer.fromJson<String?>(json['barcode']),
       name: serializer.fromJson<String>(json['name']),
       description: serializer.fromJson<String?>(json['description']),
-      price: serializer.fromJson<double>(json['price']),
+      price: serializer.fromJson<int>(json['price']),
       unit: serializer.fromJson<String>(json['unit']),
       isActive: serializer.fromJson<bool>(json['isActive']),
-      createdAt: serializer.fromJson<DateTime?>(json['createdAt']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
   @override
@@ -1088,38 +1111,42 @@ class ProductsTableData extends DataClass
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
       'storeId': serializer.toJson<int>(storeId),
+      'barcode': serializer.toJson<String?>(barcode),
       'name': serializer.toJson<String>(name),
       'description': serializer.toJson<String?>(description),
-      'price': serializer.toJson<double>(price),
+      'price': serializer.toJson<int>(price),
       'unit': serializer.toJson<String>(unit),
       'isActive': serializer.toJson<bool>(isActive),
-      'createdAt': serializer.toJson<DateTime?>(createdAt),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
 
   ProductsTableData copyWith({
     int? id,
     int? storeId,
+    Value<String?> barcode = const Value.absent(),
     String? name,
     Value<String?> description = const Value.absent(),
-    double? price,
+    int? price,
     String? unit,
     bool? isActive,
-    Value<DateTime?> createdAt = const Value.absent(),
+    DateTime? createdAt,
   }) => ProductsTableData(
     id: id ?? this.id,
     storeId: storeId ?? this.storeId,
+    barcode: barcode.present ? barcode.value : this.barcode,
     name: name ?? this.name,
     description: description.present ? description.value : this.description,
     price: price ?? this.price,
     unit: unit ?? this.unit,
     isActive: isActive ?? this.isActive,
-    createdAt: createdAt.present ? createdAt.value : this.createdAt,
+    createdAt: createdAt ?? this.createdAt,
   );
   ProductsTableData copyWithCompanion(ProductsTableCompanion data) {
     return ProductsTableData(
       id: data.id.present ? data.id.value : this.id,
       storeId: data.storeId.present ? data.storeId.value : this.storeId,
+      barcode: data.barcode.present ? data.barcode.value : this.barcode,
       name: data.name.present ? data.name.value : this.name,
       description: data.description.present
           ? data.description.value
@@ -1136,6 +1163,7 @@ class ProductsTableData extends DataClass
     return (StringBuffer('ProductsTableData(')
           ..write('id: $id, ')
           ..write('storeId: $storeId, ')
+          ..write('barcode: $barcode, ')
           ..write('name: $name, ')
           ..write('description: $description, ')
           ..write('price: $price, ')
@@ -1150,6 +1178,7 @@ class ProductsTableData extends DataClass
   int get hashCode => Object.hash(
     id,
     storeId,
+    barcode,
     name,
     description,
     price,
@@ -1163,6 +1192,7 @@ class ProductsTableData extends DataClass
       (other is ProductsTableData &&
           other.id == this.id &&
           other.storeId == this.storeId &&
+          other.barcode == this.barcode &&
           other.name == this.name &&
           other.description == this.description &&
           other.price == this.price &&
@@ -1174,15 +1204,17 @@ class ProductsTableData extends DataClass
 class ProductsTableCompanion extends UpdateCompanion<ProductsTableData> {
   final Value<int> id;
   final Value<int> storeId;
+  final Value<String?> barcode;
   final Value<String> name;
   final Value<String?> description;
-  final Value<double> price;
+  final Value<int> price;
   final Value<String> unit;
   final Value<bool> isActive;
-  final Value<DateTime?> createdAt;
+  final Value<DateTime> createdAt;
   const ProductsTableCompanion({
     this.id = const Value.absent(),
     this.storeId = const Value.absent(),
+    this.barcode = const Value.absent(),
     this.name = const Value.absent(),
     this.description = const Value.absent(),
     this.price = const Value.absent(),
@@ -1193,22 +1225,24 @@ class ProductsTableCompanion extends UpdateCompanion<ProductsTableData> {
   ProductsTableCompanion.insert({
     this.id = const Value.absent(),
     required int storeId,
+    this.barcode = const Value.absent(),
     required String name,
     this.description = const Value.absent(),
-    this.price = const Value.absent(),
+    required int price,
     required String unit,
-    required bool isActive,
+    this.isActive = const Value.absent(),
     this.createdAt = const Value.absent(),
   }) : storeId = Value(storeId),
        name = Value(name),
-       unit = Value(unit),
-       isActive = Value(isActive);
+       price = Value(price),
+       unit = Value(unit);
   static Insertable<ProductsTableData> custom({
     Expression<int>? id,
     Expression<int>? storeId,
+    Expression<String>? barcode,
     Expression<String>? name,
     Expression<String>? description,
-    Expression<double>? price,
+    Expression<int>? price,
     Expression<String>? unit,
     Expression<bool>? isActive,
     Expression<DateTime>? createdAt,
@@ -1216,6 +1250,7 @@ class ProductsTableCompanion extends UpdateCompanion<ProductsTableData> {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (storeId != null) 'store_id': storeId,
+      if (barcode != null) 'barcode': barcode,
       if (name != null) 'name': name,
       if (description != null) 'description': description,
       if (price != null) 'price': price,
@@ -1228,16 +1263,18 @@ class ProductsTableCompanion extends UpdateCompanion<ProductsTableData> {
   ProductsTableCompanion copyWith({
     Value<int>? id,
     Value<int>? storeId,
+    Value<String?>? barcode,
     Value<String>? name,
     Value<String?>? description,
-    Value<double>? price,
+    Value<int>? price,
     Value<String>? unit,
     Value<bool>? isActive,
-    Value<DateTime?>? createdAt,
+    Value<DateTime>? createdAt,
   }) {
     return ProductsTableCompanion(
       id: id ?? this.id,
       storeId: storeId ?? this.storeId,
+      barcode: barcode ?? this.barcode,
       name: name ?? this.name,
       description: description ?? this.description,
       price: price ?? this.price,
@@ -1256,6 +1293,9 @@ class ProductsTableCompanion extends UpdateCompanion<ProductsTableData> {
     if (storeId.present) {
       map['store_id'] = Variable<int>(storeId.value);
     }
+    if (barcode.present) {
+      map['barcode'] = Variable<String>(barcode.value);
+    }
     if (name.present) {
       map['name'] = Variable<String>(name.value);
     }
@@ -1263,7 +1303,7 @@ class ProductsTableCompanion extends UpdateCompanion<ProductsTableData> {
       map['description'] = Variable<String>(description.value);
     }
     if (price.present) {
-      map['price'] = Variable<double>(price.value);
+      map['price'] = Variable<int>(price.value);
     }
     if (unit.present) {
       map['unit'] = Variable<String>(unit.value);
@@ -1282,6 +1322,7 @@ class ProductsTableCompanion extends UpdateCompanion<ProductsTableData> {
     return (StringBuffer('ProductsTableCompanion(')
           ..write('id: $id, ')
           ..write('storeId: $storeId, ')
+          ..write('barcode: $barcode, ')
           ..write('name: $name, ')
           ..write('description: $description, ')
           ..write('price: $price, ')
@@ -1337,20 +1378,19 @@ class $TransactionsTableTable extends TransactionsTable
     type: DriftSqlType.int,
     requiredDuringInsert: true,
     defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'REFERENCES customers_table (id) ON DELETE CASCADE',
+      'REFERENCES customers_table (id) ON DELETE NO ACTION',
     ),
   );
   static const VerificationMeta _totalAmountMeta = const VerificationMeta(
     'totalAmount',
   );
   @override
-  late final GeneratedColumn<double> totalAmount = GeneratedColumn<double>(
+  late final GeneratedColumn<int> totalAmount = GeneratedColumn<int>(
     'total_amount',
     aliasedName,
     false,
-    type: DriftSqlType.double,
-    requiredDuringInsert: false,
-    clientDefault: () => 0.0,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
   );
   static const VerificationMeta _noteMeta = const VerificationMeta('note');
   @override
@@ -1368,9 +1408,10 @@ class $TransactionsTableTable extends TransactionsTable
   late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
     'created_at',
     aliasedName,
-    true,
+    false,
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
+    clientDefault: DateTime.now,
   );
   @override
   List<GeneratedColumn> get $columns => [
@@ -1420,6 +1461,8 @@ class $TransactionsTableTable extends TransactionsTable
           _totalAmountMeta,
         ),
       );
+    } else if (isInserting) {
+      context.missing(_totalAmountMeta);
     }
     if (data.containsKey('note')) {
       context.handle(
@@ -1455,7 +1498,7 @@ class $TransactionsTableTable extends TransactionsTable
         data['${effectivePrefix}customer_id'],
       )!,
       totalAmount: attachedDatabase.typeMapping.read(
-        DriftSqlType.double,
+        DriftSqlType.int,
         data['${effectivePrefix}total_amount'],
       )!,
       note: attachedDatabase.typeMapping.read(
@@ -1465,7 +1508,7 @@ class $TransactionsTableTable extends TransactionsTable
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
-      ),
+      )!,
     );
   }
 
@@ -1480,16 +1523,16 @@ class TransactionsTableData extends DataClass
   final int id;
   final int storeId;
   final int customerId;
-  final double totalAmount;
+  final int totalAmount;
   final String? note;
-  final DateTime? createdAt;
+  final DateTime createdAt;
   const TransactionsTableData({
     required this.id,
     required this.storeId,
     required this.customerId,
     required this.totalAmount,
     this.note,
-    this.createdAt,
+    required this.createdAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1497,13 +1540,11 @@ class TransactionsTableData extends DataClass
     map['id'] = Variable<int>(id);
     map['store_id'] = Variable<int>(storeId);
     map['customer_id'] = Variable<int>(customerId);
-    map['total_amount'] = Variable<double>(totalAmount);
+    map['total_amount'] = Variable<int>(totalAmount);
     if (!nullToAbsent || note != null) {
       map['note'] = Variable<String>(note);
     }
-    if (!nullToAbsent || createdAt != null) {
-      map['created_at'] = Variable<DateTime>(createdAt);
-    }
+    map['created_at'] = Variable<DateTime>(createdAt);
     return map;
   }
 
@@ -1514,9 +1555,7 @@ class TransactionsTableData extends DataClass
       customerId: Value(customerId),
       totalAmount: Value(totalAmount),
       note: note == null && nullToAbsent ? const Value.absent() : Value(note),
-      createdAt: createdAt == null && nullToAbsent
-          ? const Value.absent()
-          : Value(createdAt),
+      createdAt: Value(createdAt),
     );
   }
 
@@ -1529,9 +1568,9 @@ class TransactionsTableData extends DataClass
       id: serializer.fromJson<int>(json['id']),
       storeId: serializer.fromJson<int>(json['storeId']),
       customerId: serializer.fromJson<int>(json['customerId']),
-      totalAmount: serializer.fromJson<double>(json['totalAmount']),
+      totalAmount: serializer.fromJson<int>(json['totalAmount']),
       note: serializer.fromJson<String?>(json['note']),
-      createdAt: serializer.fromJson<DateTime?>(json['createdAt']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
   @override
@@ -1541,9 +1580,9 @@ class TransactionsTableData extends DataClass
       'id': serializer.toJson<int>(id),
       'storeId': serializer.toJson<int>(storeId),
       'customerId': serializer.toJson<int>(customerId),
-      'totalAmount': serializer.toJson<double>(totalAmount),
+      'totalAmount': serializer.toJson<int>(totalAmount),
       'note': serializer.toJson<String?>(note),
-      'createdAt': serializer.toJson<DateTime?>(createdAt),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
 
@@ -1551,16 +1590,16 @@ class TransactionsTableData extends DataClass
     int? id,
     int? storeId,
     int? customerId,
-    double? totalAmount,
+    int? totalAmount,
     Value<String?> note = const Value.absent(),
-    Value<DateTime?> createdAt = const Value.absent(),
+    DateTime? createdAt,
   }) => TransactionsTableData(
     id: id ?? this.id,
     storeId: storeId ?? this.storeId,
     customerId: customerId ?? this.customerId,
     totalAmount: totalAmount ?? this.totalAmount,
     note: note.present ? note.value : this.note,
-    createdAt: createdAt.present ? createdAt.value : this.createdAt,
+    createdAt: createdAt ?? this.createdAt,
   );
   TransactionsTableData copyWithCompanion(TransactionsTableCompanion data) {
     return TransactionsTableData(
@@ -1610,9 +1649,9 @@ class TransactionsTableCompanion
   final Value<int> id;
   final Value<int> storeId;
   final Value<int> customerId;
-  final Value<double> totalAmount;
+  final Value<int> totalAmount;
   final Value<String?> note;
-  final Value<DateTime?> createdAt;
+  final Value<DateTime> createdAt;
   const TransactionsTableCompanion({
     this.id = const Value.absent(),
     this.storeId = const Value.absent(),
@@ -1625,16 +1664,17 @@ class TransactionsTableCompanion
     this.id = const Value.absent(),
     required int storeId,
     required int customerId,
-    this.totalAmount = const Value.absent(),
+    required int totalAmount,
     this.note = const Value.absent(),
     this.createdAt = const Value.absent(),
   }) : storeId = Value(storeId),
-       customerId = Value(customerId);
+       customerId = Value(customerId),
+       totalAmount = Value(totalAmount);
   static Insertable<TransactionsTableData> custom({
     Expression<int>? id,
     Expression<int>? storeId,
     Expression<int>? customerId,
-    Expression<double>? totalAmount,
+    Expression<int>? totalAmount,
     Expression<String>? note,
     Expression<DateTime>? createdAt,
   }) {
@@ -1652,9 +1692,9 @@ class TransactionsTableCompanion
     Value<int>? id,
     Value<int>? storeId,
     Value<int>? customerId,
-    Value<double>? totalAmount,
+    Value<int>? totalAmount,
     Value<String?>? note,
-    Value<DateTime?>? createdAt,
+    Value<DateTime>? createdAt,
   }) {
     return TransactionsTableCompanion(
       id: id ?? this.id,
@@ -1679,7 +1719,7 @@ class TransactionsTableCompanion
       map['customer_id'] = Variable<int>(customerId.value);
     }
     if (totalAmount.present) {
-      map['total_amount'] = Variable<double>(totalAmount.value);
+      map['total_amount'] = Variable<int>(totalAmount.value);
     }
     if (note.present) {
       map['note'] = Variable<String>(note.value);
@@ -1748,7 +1788,7 @@ class $TransactionsItemTableTable extends TransactionsItemTable
     type: DriftSqlType.int,
     requiredDuringInsert: true,
     defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'REFERENCES products_table (id) ON DELETE CASCADE',
+      'REFERENCES products_table (id) ON DELETE NO ACTION',
     ),
   );
   static const VerificationMeta _quantityMeta = const VerificationMeta(
@@ -1760,32 +1800,29 @@ class $TransactionsItemTableTable extends TransactionsItemTable
     aliasedName,
     false,
     type: DriftSqlType.double,
-    requiredDuringInsert: false,
-    clientDefault: () => 0.0,
+    requiredDuringInsert: true,
   );
   static const VerificationMeta _unitPriceMeta = const VerificationMeta(
     'unitPrice',
   );
   @override
-  late final GeneratedColumn<double> unitPrice = GeneratedColumn<double>(
+  late final GeneratedColumn<int> unitPrice = GeneratedColumn<int>(
     'unit_price',
     aliasedName,
     false,
-    type: DriftSqlType.double,
-    requiredDuringInsert: false,
-    clientDefault: () => 0.0,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
   );
   static const VerificationMeta _subTotalMeta = const VerificationMeta(
     'subTotal',
   );
   @override
-  late final GeneratedColumn<double> subTotal = GeneratedColumn<double>(
+  late final GeneratedColumn<int> subTotal = GeneratedColumn<int>(
     'sub_total',
     aliasedName,
     false,
-    type: DriftSqlType.double,
-    requiredDuringInsert: false,
-    clientDefault: () => 0.0,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
   );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
@@ -1794,9 +1831,10 @@ class $TransactionsItemTableTable extends TransactionsItemTable
   late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
     'created_at',
     aliasedName,
-    true,
+    false,
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
+    clientDefault: DateTime.now,
   );
   @override
   List<GeneratedColumn> get $columns => [
@@ -1847,18 +1885,24 @@ class $TransactionsItemTableTable extends TransactionsItemTable
         _quantityMeta,
         quantity.isAcceptableOrUnknown(data['quantity']!, _quantityMeta),
       );
+    } else if (isInserting) {
+      context.missing(_quantityMeta);
     }
     if (data.containsKey('unit_price')) {
       context.handle(
         _unitPriceMeta,
         unitPrice.isAcceptableOrUnknown(data['unit_price']!, _unitPriceMeta),
       );
+    } else if (isInserting) {
+      context.missing(_unitPriceMeta);
     }
     if (data.containsKey('sub_total')) {
       context.handle(
         _subTotalMeta,
         subTotal.isAcceptableOrUnknown(data['sub_total']!, _subTotalMeta),
       );
+    } else if (isInserting) {
+      context.missing(_subTotalMeta);
     }
     if (data.containsKey('created_at')) {
       context.handle(
@@ -1895,17 +1939,17 @@ class $TransactionsItemTableTable extends TransactionsItemTable
         data['${effectivePrefix}quantity'],
       )!,
       unitPrice: attachedDatabase.typeMapping.read(
-        DriftSqlType.double,
+        DriftSqlType.int,
         data['${effectivePrefix}unit_price'],
       )!,
       subTotal: attachedDatabase.typeMapping.read(
-        DriftSqlType.double,
+        DriftSqlType.int,
         data['${effectivePrefix}sub_total'],
       )!,
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
-      ),
+      )!,
     );
   }
 
@@ -1921,9 +1965,9 @@ class TransactionsItemTableData extends DataClass
   final int transactionId;
   final int productId;
   final double quantity;
-  final double unitPrice;
-  final double subTotal;
-  final DateTime? createdAt;
+  final int unitPrice;
+  final int subTotal;
+  final DateTime createdAt;
   const TransactionsItemTableData({
     required this.id,
     required this.transactionId,
@@ -1931,7 +1975,7 @@ class TransactionsItemTableData extends DataClass
     required this.quantity,
     required this.unitPrice,
     required this.subTotal,
-    this.createdAt,
+    required this.createdAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1940,11 +1984,9 @@ class TransactionsItemTableData extends DataClass
     map['transaction_id'] = Variable<int>(transactionId);
     map['product_id'] = Variable<int>(productId);
     map['quantity'] = Variable<double>(quantity);
-    map['unit_price'] = Variable<double>(unitPrice);
-    map['sub_total'] = Variable<double>(subTotal);
-    if (!nullToAbsent || createdAt != null) {
-      map['created_at'] = Variable<DateTime>(createdAt);
-    }
+    map['unit_price'] = Variable<int>(unitPrice);
+    map['sub_total'] = Variable<int>(subTotal);
+    map['created_at'] = Variable<DateTime>(createdAt);
     return map;
   }
 
@@ -1956,9 +1998,7 @@ class TransactionsItemTableData extends DataClass
       quantity: Value(quantity),
       unitPrice: Value(unitPrice),
       subTotal: Value(subTotal),
-      createdAt: createdAt == null && nullToAbsent
-          ? const Value.absent()
-          : Value(createdAt),
+      createdAt: Value(createdAt),
     );
   }
 
@@ -1972,9 +2012,9 @@ class TransactionsItemTableData extends DataClass
       transactionId: serializer.fromJson<int>(json['transactionId']),
       productId: serializer.fromJson<int>(json['productId']),
       quantity: serializer.fromJson<double>(json['quantity']),
-      unitPrice: serializer.fromJson<double>(json['unitPrice']),
-      subTotal: serializer.fromJson<double>(json['subTotal']),
-      createdAt: serializer.fromJson<DateTime?>(json['createdAt']),
+      unitPrice: serializer.fromJson<int>(json['unitPrice']),
+      subTotal: serializer.fromJson<int>(json['subTotal']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
   @override
@@ -1985,9 +2025,9 @@ class TransactionsItemTableData extends DataClass
       'transactionId': serializer.toJson<int>(transactionId),
       'productId': serializer.toJson<int>(productId),
       'quantity': serializer.toJson<double>(quantity),
-      'unitPrice': serializer.toJson<double>(unitPrice),
-      'subTotal': serializer.toJson<double>(subTotal),
-      'createdAt': serializer.toJson<DateTime?>(createdAt),
+      'unitPrice': serializer.toJson<int>(unitPrice),
+      'subTotal': serializer.toJson<int>(subTotal),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
 
@@ -1996,9 +2036,9 @@ class TransactionsItemTableData extends DataClass
     int? transactionId,
     int? productId,
     double? quantity,
-    double? unitPrice,
-    double? subTotal,
-    Value<DateTime?> createdAt = const Value.absent(),
+    int? unitPrice,
+    int? subTotal,
+    DateTime? createdAt,
   }) => TransactionsItemTableData(
     id: id ?? this.id,
     transactionId: transactionId ?? this.transactionId,
@@ -2006,7 +2046,7 @@ class TransactionsItemTableData extends DataClass
     quantity: quantity ?? this.quantity,
     unitPrice: unitPrice ?? this.unitPrice,
     subTotal: subTotal ?? this.subTotal,
-    createdAt: createdAt.present ? createdAt.value : this.createdAt,
+    createdAt: createdAt ?? this.createdAt,
   );
   TransactionsItemTableData copyWithCompanion(
     TransactionsItemTableCompanion data,
@@ -2067,9 +2107,9 @@ class TransactionsItemTableCompanion
   final Value<int> transactionId;
   final Value<int> productId;
   final Value<double> quantity;
-  final Value<double> unitPrice;
-  final Value<double> subTotal;
-  final Value<DateTime?> createdAt;
+  final Value<int> unitPrice;
+  final Value<int> subTotal;
+  final Value<DateTime> createdAt;
   const TransactionsItemTableCompanion({
     this.id = const Value.absent(),
     this.transactionId = const Value.absent(),
@@ -2083,19 +2123,22 @@ class TransactionsItemTableCompanion
     this.id = const Value.absent(),
     required int transactionId,
     required int productId,
-    this.quantity = const Value.absent(),
-    this.unitPrice = const Value.absent(),
-    this.subTotal = const Value.absent(),
+    required double quantity,
+    required int unitPrice,
+    required int subTotal,
     this.createdAt = const Value.absent(),
   }) : transactionId = Value(transactionId),
-       productId = Value(productId);
+       productId = Value(productId),
+       quantity = Value(quantity),
+       unitPrice = Value(unitPrice),
+       subTotal = Value(subTotal);
   static Insertable<TransactionsItemTableData> custom({
     Expression<int>? id,
     Expression<int>? transactionId,
     Expression<int>? productId,
     Expression<double>? quantity,
-    Expression<double>? unitPrice,
-    Expression<double>? subTotal,
+    Expression<int>? unitPrice,
+    Expression<int>? subTotal,
     Expression<DateTime>? createdAt,
   }) {
     return RawValuesInsertable({
@@ -2114,9 +2157,9 @@ class TransactionsItemTableCompanion
     Value<int>? transactionId,
     Value<int>? productId,
     Value<double>? quantity,
-    Value<double>? unitPrice,
-    Value<double>? subTotal,
-    Value<DateTime?>? createdAt,
+    Value<int>? unitPrice,
+    Value<int>? subTotal,
+    Value<DateTime>? createdAt,
   }) {
     return TransactionsItemTableCompanion(
       id: id ?? this.id,
@@ -2145,10 +2188,10 @@ class TransactionsItemTableCompanion
       map['quantity'] = Variable<double>(quantity.value);
     }
     if (unitPrice.present) {
-      map['unit_price'] = Variable<double>(unitPrice.value);
+      map['unit_price'] = Variable<int>(unitPrice.value);
     }
     if (subTotal.present) {
-      map['sub_total'] = Variable<double>(subTotal.value);
+      map['sub_total'] = Variable<int>(subTotal.value);
     }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
@@ -2215,18 +2258,17 @@ class $PaymentsTableTable extends PaymentsTable
     type: DriftSqlType.int,
     requiredDuringInsert: true,
     defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'REFERENCES customers_table (id) ON DELETE CASCADE',
+      'REFERENCES customers_table (id) ON DELETE NO ACTION',
     ),
   );
   static const VerificationMeta _amountMeta = const VerificationMeta('amount');
   @override
-  late final GeneratedColumn<double> amount = GeneratedColumn<double>(
+  late final GeneratedColumn<int> amount = GeneratedColumn<int>(
     'amount',
     aliasedName,
     false,
-    type: DriftSqlType.double,
-    requiredDuringInsert: false,
-    clientDefault: () => 0.0,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
   );
   static const VerificationMeta _noteMeta = const VerificationMeta('note');
   @override
@@ -2244,9 +2286,10 @@ class $PaymentsTableTable extends PaymentsTable
   late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
     'created_at',
     aliasedName,
-    true,
+    false,
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
+    clientDefault: DateTime.now,
   );
   @override
   List<GeneratedColumn> get $columns => [
@@ -2293,6 +2336,8 @@ class $PaymentsTableTable extends PaymentsTable
         _amountMeta,
         amount.isAcceptableOrUnknown(data['amount']!, _amountMeta),
       );
+    } else if (isInserting) {
+      context.missing(_amountMeta);
     }
     if (data.containsKey('note')) {
       context.handle(
@@ -2328,7 +2373,7 @@ class $PaymentsTableTable extends PaymentsTable
         data['${effectivePrefix}customer_id'],
       )!,
       amount: attachedDatabase.typeMapping.read(
-        DriftSqlType.double,
+        DriftSqlType.int,
         data['${effectivePrefix}amount'],
       )!,
       note: attachedDatabase.typeMapping.read(
@@ -2338,7 +2383,7 @@ class $PaymentsTableTable extends PaymentsTable
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
-      ),
+      )!,
     );
   }
 
@@ -2353,16 +2398,16 @@ class PaymentsTableData extends DataClass
   final int id;
   final int storeId;
   final int customerId;
-  final double amount;
+  final int amount;
   final String? note;
-  final DateTime? createdAt;
+  final DateTime createdAt;
   const PaymentsTableData({
     required this.id,
     required this.storeId,
     required this.customerId,
     required this.amount,
     this.note,
-    this.createdAt,
+    required this.createdAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2370,13 +2415,11 @@ class PaymentsTableData extends DataClass
     map['id'] = Variable<int>(id);
     map['store_id'] = Variable<int>(storeId);
     map['customer_id'] = Variable<int>(customerId);
-    map['amount'] = Variable<double>(amount);
+    map['amount'] = Variable<int>(amount);
     if (!nullToAbsent || note != null) {
       map['note'] = Variable<String>(note);
     }
-    if (!nullToAbsent || createdAt != null) {
-      map['created_at'] = Variable<DateTime>(createdAt);
-    }
+    map['created_at'] = Variable<DateTime>(createdAt);
     return map;
   }
 
@@ -2387,9 +2430,7 @@ class PaymentsTableData extends DataClass
       customerId: Value(customerId),
       amount: Value(amount),
       note: note == null && nullToAbsent ? const Value.absent() : Value(note),
-      createdAt: createdAt == null && nullToAbsent
-          ? const Value.absent()
-          : Value(createdAt),
+      createdAt: Value(createdAt),
     );
   }
 
@@ -2402,9 +2443,9 @@ class PaymentsTableData extends DataClass
       id: serializer.fromJson<int>(json['id']),
       storeId: serializer.fromJson<int>(json['storeId']),
       customerId: serializer.fromJson<int>(json['customerId']),
-      amount: serializer.fromJson<double>(json['amount']),
+      amount: serializer.fromJson<int>(json['amount']),
       note: serializer.fromJson<String?>(json['note']),
-      createdAt: serializer.fromJson<DateTime?>(json['createdAt']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
   @override
@@ -2414,9 +2455,9 @@ class PaymentsTableData extends DataClass
       'id': serializer.toJson<int>(id),
       'storeId': serializer.toJson<int>(storeId),
       'customerId': serializer.toJson<int>(customerId),
-      'amount': serializer.toJson<double>(amount),
+      'amount': serializer.toJson<int>(amount),
       'note': serializer.toJson<String?>(note),
-      'createdAt': serializer.toJson<DateTime?>(createdAt),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
 
@@ -2424,16 +2465,16 @@ class PaymentsTableData extends DataClass
     int? id,
     int? storeId,
     int? customerId,
-    double? amount,
+    int? amount,
     Value<String?> note = const Value.absent(),
-    Value<DateTime?> createdAt = const Value.absent(),
+    DateTime? createdAt,
   }) => PaymentsTableData(
     id: id ?? this.id,
     storeId: storeId ?? this.storeId,
     customerId: customerId ?? this.customerId,
     amount: amount ?? this.amount,
     note: note.present ? note.value : this.note,
-    createdAt: createdAt.present ? createdAt.value : this.createdAt,
+    createdAt: createdAt ?? this.createdAt,
   );
   PaymentsTableData copyWithCompanion(PaymentsTableCompanion data) {
     return PaymentsTableData(
@@ -2480,9 +2521,9 @@ class PaymentsTableCompanion extends UpdateCompanion<PaymentsTableData> {
   final Value<int> id;
   final Value<int> storeId;
   final Value<int> customerId;
-  final Value<double> amount;
+  final Value<int> amount;
   final Value<String?> note;
-  final Value<DateTime?> createdAt;
+  final Value<DateTime> createdAt;
   const PaymentsTableCompanion({
     this.id = const Value.absent(),
     this.storeId = const Value.absent(),
@@ -2495,16 +2536,17 @@ class PaymentsTableCompanion extends UpdateCompanion<PaymentsTableData> {
     this.id = const Value.absent(),
     required int storeId,
     required int customerId,
-    this.amount = const Value.absent(),
+    required int amount,
     this.note = const Value.absent(),
     this.createdAt = const Value.absent(),
   }) : storeId = Value(storeId),
-       customerId = Value(customerId);
+       customerId = Value(customerId),
+       amount = Value(amount);
   static Insertable<PaymentsTableData> custom({
     Expression<int>? id,
     Expression<int>? storeId,
     Expression<int>? customerId,
-    Expression<double>? amount,
+    Expression<int>? amount,
     Expression<String>? note,
     Expression<DateTime>? createdAt,
   }) {
@@ -2522,9 +2564,9 @@ class PaymentsTableCompanion extends UpdateCompanion<PaymentsTableData> {
     Value<int>? id,
     Value<int>? storeId,
     Value<int>? customerId,
-    Value<double>? amount,
+    Value<int>? amount,
     Value<String?>? note,
-    Value<DateTime?>? createdAt,
+    Value<DateTime>? createdAt,
   }) {
     return PaymentsTableCompanion(
       id: id ?? this.id,
@@ -2549,7 +2591,7 @@ class PaymentsTableCompanion extends UpdateCompanion<PaymentsTableData> {
       map['customer_id'] = Variable<int>(customerId.value);
     }
     if (amount.present) {
-      map['amount'] = Variable<double>(amount.value);
+      map['amount'] = Variable<int>(amount.value);
     }
     if (note.present) {
       map['note'] = Variable<String>(note.value);
@@ -2620,26 +2662,26 @@ class $StoreSettingsTableTable extends StoreSettingsTable
         defaultConstraints: GeneratedColumn.constraintIsAlways(
           'CHECK ("monthly_interest_enabled" IN (0, 1))',
         ),
-        clientDefault: () => false,
+        defaultValue: const Constant(false),
       );
-  static const VerificationMeta _monthlyInterestRateMeta =
-      const VerificationMeta('monthlyInterestRate');
+  static const VerificationMeta _monthlyInterestRateBasisPointsMeta =
+      const VerificationMeta('monthlyInterestRateBasisPoints');
   @override
-  late final GeneratedColumn<double> monthlyInterestRate =
-      GeneratedColumn<double>(
-        'monthly_interest_rate',
+  late final GeneratedColumn<int> monthlyInterestRateBasisPoints =
+      GeneratedColumn<int>(
+        'monthly_interest_rate_basis_points',
         aliasedName,
         false,
-        type: DriftSqlType.double,
+        type: DriftSqlType.int,
         requiredDuringInsert: false,
-        clientDefault: () => 0.0,
+        defaultValue: const Constant(0),
       );
   @override
   List<GeneratedColumn> get $columns => [
     id,
     storeId,
     monthlyInterestEnabled,
-    monthlyInterestRate,
+    monthlyInterestRateBasisPoints,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2673,12 +2715,12 @@ class $StoreSettingsTableTable extends StoreSettingsTable
         ),
       );
     }
-    if (data.containsKey('monthly_interest_rate')) {
+    if (data.containsKey('monthly_interest_rate_basis_points')) {
       context.handle(
-        _monthlyInterestRateMeta,
-        monthlyInterestRate.isAcceptableOrUnknown(
-          data['monthly_interest_rate']!,
-          _monthlyInterestRateMeta,
+        _monthlyInterestRateBasisPointsMeta,
+        monthlyInterestRateBasisPoints.isAcceptableOrUnknown(
+          data['monthly_interest_rate_basis_points']!,
+          _monthlyInterestRateBasisPointsMeta,
         ),
       );
     }
@@ -2703,9 +2745,9 @@ class $StoreSettingsTableTable extends StoreSettingsTable
         DriftSqlType.bool,
         data['${effectivePrefix}monthly_interest_enabled'],
       )!,
-      monthlyInterestRate: attachedDatabase.typeMapping.read(
-        DriftSqlType.double,
-        data['${effectivePrefix}monthly_interest_rate'],
+      monthlyInterestRateBasisPoints: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}monthly_interest_rate_basis_points'],
       )!,
     );
   }
@@ -2721,12 +2763,12 @@ class StoreSettingsTableData extends DataClass
   final int id;
   final int storeId;
   final bool monthlyInterestEnabled;
-  final double monthlyInterestRate;
+  final int monthlyInterestRateBasisPoints;
   const StoreSettingsTableData({
     required this.id,
     required this.storeId,
     required this.monthlyInterestEnabled,
-    required this.monthlyInterestRate,
+    required this.monthlyInterestRateBasisPoints,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2734,7 +2776,9 @@ class StoreSettingsTableData extends DataClass
     map['id'] = Variable<int>(id);
     map['store_id'] = Variable<int>(storeId);
     map['monthly_interest_enabled'] = Variable<bool>(monthlyInterestEnabled);
-    map['monthly_interest_rate'] = Variable<double>(monthlyInterestRate);
+    map['monthly_interest_rate_basis_points'] = Variable<int>(
+      monthlyInterestRateBasisPoints,
+    );
     return map;
   }
 
@@ -2743,7 +2787,7 @@ class StoreSettingsTableData extends DataClass
       id: Value(id),
       storeId: Value(storeId),
       monthlyInterestEnabled: Value(monthlyInterestEnabled),
-      monthlyInterestRate: Value(monthlyInterestRate),
+      monthlyInterestRateBasisPoints: Value(monthlyInterestRateBasisPoints),
     );
   }
 
@@ -2758,8 +2802,8 @@ class StoreSettingsTableData extends DataClass
       monthlyInterestEnabled: serializer.fromJson<bool>(
         json['monthlyInterestEnabled'],
       ),
-      monthlyInterestRate: serializer.fromJson<double>(
-        json['monthlyInterestRate'],
+      monthlyInterestRateBasisPoints: serializer.fromJson<int>(
+        json['monthlyInterestRateBasisPoints'],
       ),
     );
   }
@@ -2770,7 +2814,9 @@ class StoreSettingsTableData extends DataClass
       'id': serializer.toJson<int>(id),
       'storeId': serializer.toJson<int>(storeId),
       'monthlyInterestEnabled': serializer.toJson<bool>(monthlyInterestEnabled),
-      'monthlyInterestRate': serializer.toJson<double>(monthlyInterestRate),
+      'monthlyInterestRateBasisPoints': serializer.toJson<int>(
+        monthlyInterestRateBasisPoints,
+      ),
     };
   }
 
@@ -2778,13 +2824,14 @@ class StoreSettingsTableData extends DataClass
     int? id,
     int? storeId,
     bool? monthlyInterestEnabled,
-    double? monthlyInterestRate,
+    int? monthlyInterestRateBasisPoints,
   }) => StoreSettingsTableData(
     id: id ?? this.id,
     storeId: storeId ?? this.storeId,
     monthlyInterestEnabled:
         monthlyInterestEnabled ?? this.monthlyInterestEnabled,
-    monthlyInterestRate: monthlyInterestRate ?? this.monthlyInterestRate,
+    monthlyInterestRateBasisPoints:
+        monthlyInterestRateBasisPoints ?? this.monthlyInterestRateBasisPoints,
   );
   StoreSettingsTableData copyWithCompanion(StoreSettingsTableCompanion data) {
     return StoreSettingsTableData(
@@ -2793,9 +2840,10 @@ class StoreSettingsTableData extends DataClass
       monthlyInterestEnabled: data.monthlyInterestEnabled.present
           ? data.monthlyInterestEnabled.value
           : this.monthlyInterestEnabled,
-      monthlyInterestRate: data.monthlyInterestRate.present
-          ? data.monthlyInterestRate.value
-          : this.monthlyInterestRate,
+      monthlyInterestRateBasisPoints:
+          data.monthlyInterestRateBasisPoints.present
+          ? data.monthlyInterestRateBasisPoints.value
+          : this.monthlyInterestRateBasisPoints,
     );
   }
 
@@ -2805,14 +2853,20 @@ class StoreSettingsTableData extends DataClass
           ..write('id: $id, ')
           ..write('storeId: $storeId, ')
           ..write('monthlyInterestEnabled: $monthlyInterestEnabled, ')
-          ..write('monthlyInterestRate: $monthlyInterestRate')
+          ..write(
+            'monthlyInterestRateBasisPoints: $monthlyInterestRateBasisPoints',
+          )
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, storeId, monthlyInterestEnabled, monthlyInterestRate);
+  int get hashCode => Object.hash(
+    id,
+    storeId,
+    monthlyInterestEnabled,
+    monthlyInterestRateBasisPoints,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -2820,7 +2874,8 @@ class StoreSettingsTableData extends DataClass
           other.id == this.id &&
           other.storeId == this.storeId &&
           other.monthlyInterestEnabled == this.monthlyInterestEnabled &&
-          other.monthlyInterestRate == this.monthlyInterestRate);
+          other.monthlyInterestRateBasisPoints ==
+              this.monthlyInterestRateBasisPoints);
 }
 
 class StoreSettingsTableCompanion
@@ -2828,32 +2883,32 @@ class StoreSettingsTableCompanion
   final Value<int> id;
   final Value<int> storeId;
   final Value<bool> monthlyInterestEnabled;
-  final Value<double> monthlyInterestRate;
+  final Value<int> monthlyInterestRateBasisPoints;
   const StoreSettingsTableCompanion({
     this.id = const Value.absent(),
     this.storeId = const Value.absent(),
     this.monthlyInterestEnabled = const Value.absent(),
-    this.monthlyInterestRate = const Value.absent(),
+    this.monthlyInterestRateBasisPoints = const Value.absent(),
   });
   StoreSettingsTableCompanion.insert({
     this.id = const Value.absent(),
     required int storeId,
     this.monthlyInterestEnabled = const Value.absent(),
-    this.monthlyInterestRate = const Value.absent(),
+    this.monthlyInterestRateBasisPoints = const Value.absent(),
   }) : storeId = Value(storeId);
   static Insertable<StoreSettingsTableData> custom({
     Expression<int>? id,
     Expression<int>? storeId,
     Expression<bool>? monthlyInterestEnabled,
-    Expression<double>? monthlyInterestRate,
+    Expression<int>? monthlyInterestRateBasisPoints,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (storeId != null) 'store_id': storeId,
       if (monthlyInterestEnabled != null)
         'monthly_interest_enabled': monthlyInterestEnabled,
-      if (monthlyInterestRate != null)
-        'monthly_interest_rate': monthlyInterestRate,
+      if (monthlyInterestRateBasisPoints != null)
+        'monthly_interest_rate_basis_points': monthlyInterestRateBasisPoints,
     });
   }
 
@@ -2861,14 +2916,15 @@ class StoreSettingsTableCompanion
     Value<int>? id,
     Value<int>? storeId,
     Value<bool>? monthlyInterestEnabled,
-    Value<double>? monthlyInterestRate,
+    Value<int>? monthlyInterestRateBasisPoints,
   }) {
     return StoreSettingsTableCompanion(
       id: id ?? this.id,
       storeId: storeId ?? this.storeId,
       monthlyInterestEnabled:
           monthlyInterestEnabled ?? this.monthlyInterestEnabled,
-      monthlyInterestRate: monthlyInterestRate ?? this.monthlyInterestRate,
+      monthlyInterestRateBasisPoints:
+          monthlyInterestRateBasisPoints ?? this.monthlyInterestRateBasisPoints,
     );
   }
 
@@ -2886,9 +2942,9 @@ class StoreSettingsTableCompanion
         monthlyInterestEnabled.value,
       );
     }
-    if (monthlyInterestRate.present) {
-      map['monthly_interest_rate'] = Variable<double>(
-        monthlyInterestRate.value,
+    if (monthlyInterestRateBasisPoints.present) {
+      map['monthly_interest_rate_basis_points'] = Variable<int>(
+        monthlyInterestRateBasisPoints.value,
       );
     }
     return map;
@@ -2900,7 +2956,9 @@ class StoreSettingsTableCompanion
           ..write('id: $id, ')
           ..write('storeId: $storeId, ')
           ..write('monthlyInterestEnabled: $monthlyInterestEnabled, ')
-          ..write('monthlyInterestRate: $monthlyInterestRate')
+          ..write(
+            'monthlyInterestRateBasisPoints: $monthlyInterestRateBasisPoints',
+          )
           ..write(')'))
         .toString();
   }
@@ -2950,42 +3008,56 @@ class $InterestRecordsTableTable extends InterestRecordsTable
     type: DriftSqlType.int,
     requiredDuringInsert: true,
     defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'REFERENCES customers_table (id) ON DELETE CASCADE',
+      'REFERENCES customers_table (id) ON DELETE NO ACTION',
     ),
   );
-  static const VerificationMeta _rateMeta = const VerificationMeta('rate');
+  static const VerificationMeta _rateBasisPointsMeta = const VerificationMeta(
+    'rateBasisPoints',
+  );
   @override
-  late final GeneratedColumn<double> rate = GeneratedColumn<double>(
-    'rate',
+  late final GeneratedColumn<int> rateBasisPoints = GeneratedColumn<int>(
+    'rate_basis_points',
     aliasedName,
     false,
-    type: DriftSqlType.double,
-    requiredDuringInsert: false,
-    clientDefault: () => 0.0,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
   );
   static const VerificationMeta _baseAmountMeta = const VerificationMeta(
     'baseAmount',
   );
   @override
-  late final GeneratedColumn<double> baseAmount = GeneratedColumn<double>(
+  late final GeneratedColumn<int> baseAmount = GeneratedColumn<int>(
     'base_amount',
     aliasedName,
     false,
-    type: DriftSqlType.double,
-    requiredDuringInsert: false,
-    clientDefault: () => 0.0,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
   );
   static const VerificationMeta _interestAmountMeta = const VerificationMeta(
     'interestAmount',
   );
   @override
-  late final GeneratedColumn<double> interestAmount = GeneratedColumn<double>(
+  late final GeneratedColumn<int> interestAmount = GeneratedColumn<int>(
     'interest_amount',
     aliasedName,
     false,
-    type: DriftSqlType.double,
-    requiredDuringInsert: false,
-    clientDefault: () => 0.0,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _periodKeyMeta = const VerificationMeta(
+    'periodKey',
+  );
+  @override
+  late final GeneratedColumn<String> periodKey = GeneratedColumn<String>(
+    'period_key',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 7,
+      maxTextLength: 7,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
   );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
@@ -2994,18 +3066,20 @@ class $InterestRecordsTableTable extends InterestRecordsTable
   late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
     'created_at',
     aliasedName,
-    true,
+    false,
     type: DriftSqlType.dateTime,
     requiredDuringInsert: false,
+    clientDefault: DateTime.now,
   );
   @override
   List<GeneratedColumn> get $columns => [
     id,
     storeId,
     customerId,
-    rate,
+    rateBasisPoints,
     baseAmount,
     interestAmount,
+    periodKey,
     createdAt,
   ];
   @override
@@ -3039,17 +3113,24 @@ class $InterestRecordsTableTable extends InterestRecordsTable
     } else if (isInserting) {
       context.missing(_customerIdMeta);
     }
-    if (data.containsKey('rate')) {
+    if (data.containsKey('rate_basis_points')) {
       context.handle(
-        _rateMeta,
-        rate.isAcceptableOrUnknown(data['rate']!, _rateMeta),
+        _rateBasisPointsMeta,
+        rateBasisPoints.isAcceptableOrUnknown(
+          data['rate_basis_points']!,
+          _rateBasisPointsMeta,
+        ),
       );
+    } else if (isInserting) {
+      context.missing(_rateBasisPointsMeta);
     }
     if (data.containsKey('base_amount')) {
       context.handle(
         _baseAmountMeta,
         baseAmount.isAcceptableOrUnknown(data['base_amount']!, _baseAmountMeta),
       );
+    } else if (isInserting) {
+      context.missing(_baseAmountMeta);
     }
     if (data.containsKey('interest_amount')) {
       context.handle(
@@ -3059,6 +3140,16 @@ class $InterestRecordsTableTable extends InterestRecordsTable
           _interestAmountMeta,
         ),
       );
+    } else if (isInserting) {
+      context.missing(_interestAmountMeta);
+    }
+    if (data.containsKey('period_key')) {
+      context.handle(
+        _periodKeyMeta,
+        periodKey.isAcceptableOrUnknown(data['period_key']!, _periodKeyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_periodKeyMeta);
     }
     if (data.containsKey('created_at')) {
       context.handle(
@@ -3090,22 +3181,26 @@ class $InterestRecordsTableTable extends InterestRecordsTable
         DriftSqlType.int,
         data['${effectivePrefix}customer_id'],
       )!,
-      rate: attachedDatabase.typeMapping.read(
-        DriftSqlType.double,
-        data['${effectivePrefix}rate'],
+      rateBasisPoints: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}rate_basis_points'],
       )!,
       baseAmount: attachedDatabase.typeMapping.read(
-        DriftSqlType.double,
+        DriftSqlType.int,
         data['${effectivePrefix}base_amount'],
       )!,
       interestAmount: attachedDatabase.typeMapping.read(
-        DriftSqlType.double,
+        DriftSqlType.int,
         data['${effectivePrefix}interest_amount'],
+      )!,
+      periodKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}period_key'],
       )!,
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
-      ),
+      )!,
     );
   }
 
@@ -3120,18 +3215,20 @@ class InterestRecordsTableData extends DataClass
   final int id;
   final int storeId;
   final int customerId;
-  final double rate;
-  final double baseAmount;
-  final double interestAmount;
-  final DateTime? createdAt;
+  final int rateBasisPoints;
+  final int baseAmount;
+  final int interestAmount;
+  final String periodKey;
+  final DateTime createdAt;
   const InterestRecordsTableData({
     required this.id,
     required this.storeId,
     required this.customerId,
-    required this.rate,
+    required this.rateBasisPoints,
     required this.baseAmount,
     required this.interestAmount,
-    this.createdAt,
+    required this.periodKey,
+    required this.createdAt,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -3139,12 +3236,11 @@ class InterestRecordsTableData extends DataClass
     map['id'] = Variable<int>(id);
     map['store_id'] = Variable<int>(storeId);
     map['customer_id'] = Variable<int>(customerId);
-    map['rate'] = Variable<double>(rate);
-    map['base_amount'] = Variable<double>(baseAmount);
-    map['interest_amount'] = Variable<double>(interestAmount);
-    if (!nullToAbsent || createdAt != null) {
-      map['created_at'] = Variable<DateTime>(createdAt);
-    }
+    map['rate_basis_points'] = Variable<int>(rateBasisPoints);
+    map['base_amount'] = Variable<int>(baseAmount);
+    map['interest_amount'] = Variable<int>(interestAmount);
+    map['period_key'] = Variable<String>(periodKey);
+    map['created_at'] = Variable<DateTime>(createdAt);
     return map;
   }
 
@@ -3153,12 +3249,11 @@ class InterestRecordsTableData extends DataClass
       id: Value(id),
       storeId: Value(storeId),
       customerId: Value(customerId),
-      rate: Value(rate),
+      rateBasisPoints: Value(rateBasisPoints),
       baseAmount: Value(baseAmount),
       interestAmount: Value(interestAmount),
-      createdAt: createdAt == null && nullToAbsent
-          ? const Value.absent()
-          : Value(createdAt),
+      periodKey: Value(periodKey),
+      createdAt: Value(createdAt),
     );
   }
 
@@ -3171,10 +3266,11 @@ class InterestRecordsTableData extends DataClass
       id: serializer.fromJson<int>(json['id']),
       storeId: serializer.fromJson<int>(json['storeId']),
       customerId: serializer.fromJson<int>(json['customerId']),
-      rate: serializer.fromJson<double>(json['rate']),
-      baseAmount: serializer.fromJson<double>(json['baseAmount']),
-      interestAmount: serializer.fromJson<double>(json['interestAmount']),
-      createdAt: serializer.fromJson<DateTime?>(json['createdAt']),
+      rateBasisPoints: serializer.fromJson<int>(json['rateBasisPoints']),
+      baseAmount: serializer.fromJson<int>(json['baseAmount']),
+      interestAmount: serializer.fromJson<int>(json['interestAmount']),
+      periodKey: serializer.fromJson<String>(json['periodKey']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
   @override
@@ -3184,10 +3280,11 @@ class InterestRecordsTableData extends DataClass
       'id': serializer.toJson<int>(id),
       'storeId': serializer.toJson<int>(storeId),
       'customerId': serializer.toJson<int>(customerId),
-      'rate': serializer.toJson<double>(rate),
-      'baseAmount': serializer.toJson<double>(baseAmount),
-      'interestAmount': serializer.toJson<double>(interestAmount),
-      'createdAt': serializer.toJson<DateTime?>(createdAt),
+      'rateBasisPoints': serializer.toJson<int>(rateBasisPoints),
+      'baseAmount': serializer.toJson<int>(baseAmount),
+      'interestAmount': serializer.toJson<int>(interestAmount),
+      'periodKey': serializer.toJson<String>(periodKey),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
 
@@ -3195,18 +3292,20 @@ class InterestRecordsTableData extends DataClass
     int? id,
     int? storeId,
     int? customerId,
-    double? rate,
-    double? baseAmount,
-    double? interestAmount,
-    Value<DateTime?> createdAt = const Value.absent(),
+    int? rateBasisPoints,
+    int? baseAmount,
+    int? interestAmount,
+    String? periodKey,
+    DateTime? createdAt,
   }) => InterestRecordsTableData(
     id: id ?? this.id,
     storeId: storeId ?? this.storeId,
     customerId: customerId ?? this.customerId,
-    rate: rate ?? this.rate,
+    rateBasisPoints: rateBasisPoints ?? this.rateBasisPoints,
     baseAmount: baseAmount ?? this.baseAmount,
     interestAmount: interestAmount ?? this.interestAmount,
-    createdAt: createdAt.present ? createdAt.value : this.createdAt,
+    periodKey: periodKey ?? this.periodKey,
+    createdAt: createdAt ?? this.createdAt,
   );
   InterestRecordsTableData copyWithCompanion(
     InterestRecordsTableCompanion data,
@@ -3217,13 +3316,16 @@ class InterestRecordsTableData extends DataClass
       customerId: data.customerId.present
           ? data.customerId.value
           : this.customerId,
-      rate: data.rate.present ? data.rate.value : this.rate,
+      rateBasisPoints: data.rateBasisPoints.present
+          ? data.rateBasisPoints.value
+          : this.rateBasisPoints,
       baseAmount: data.baseAmount.present
           ? data.baseAmount.value
           : this.baseAmount,
       interestAmount: data.interestAmount.present
           ? data.interestAmount.value
           : this.interestAmount,
+      periodKey: data.periodKey.present ? data.periodKey.value : this.periodKey,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -3234,9 +3336,10 @@ class InterestRecordsTableData extends DataClass
           ..write('id: $id, ')
           ..write('storeId: $storeId, ')
           ..write('customerId: $customerId, ')
-          ..write('rate: $rate, ')
+          ..write('rateBasisPoints: $rateBasisPoints, ')
           ..write('baseAmount: $baseAmount, ')
           ..write('interestAmount: $interestAmount, ')
+          ..write('periodKey: $periodKey, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -3247,9 +3350,10 @@ class InterestRecordsTableData extends DataClass
     id,
     storeId,
     customerId,
-    rate,
+    rateBasisPoints,
     baseAmount,
     interestAmount,
+    periodKey,
     createdAt,
   );
   @override
@@ -3259,9 +3363,10 @@ class InterestRecordsTableData extends DataClass
           other.id == this.id &&
           other.storeId == this.storeId &&
           other.customerId == this.customerId &&
-          other.rate == this.rate &&
+          other.rateBasisPoints == this.rateBasisPoints &&
           other.baseAmount == this.baseAmount &&
           other.interestAmount == this.interestAmount &&
+          other.periodKey == this.periodKey &&
           other.createdAt == this.createdAt);
 }
 
@@ -3270,45 +3375,54 @@ class InterestRecordsTableCompanion
   final Value<int> id;
   final Value<int> storeId;
   final Value<int> customerId;
-  final Value<double> rate;
-  final Value<double> baseAmount;
-  final Value<double> interestAmount;
-  final Value<DateTime?> createdAt;
+  final Value<int> rateBasisPoints;
+  final Value<int> baseAmount;
+  final Value<int> interestAmount;
+  final Value<String> periodKey;
+  final Value<DateTime> createdAt;
   const InterestRecordsTableCompanion({
     this.id = const Value.absent(),
     this.storeId = const Value.absent(),
     this.customerId = const Value.absent(),
-    this.rate = const Value.absent(),
+    this.rateBasisPoints = const Value.absent(),
     this.baseAmount = const Value.absent(),
     this.interestAmount = const Value.absent(),
+    this.periodKey = const Value.absent(),
     this.createdAt = const Value.absent(),
   });
   InterestRecordsTableCompanion.insert({
     this.id = const Value.absent(),
     required int storeId,
     required int customerId,
-    this.rate = const Value.absent(),
-    this.baseAmount = const Value.absent(),
-    this.interestAmount = const Value.absent(),
+    required int rateBasisPoints,
+    required int baseAmount,
+    required int interestAmount,
+    required String periodKey,
     this.createdAt = const Value.absent(),
   }) : storeId = Value(storeId),
-       customerId = Value(customerId);
+       customerId = Value(customerId),
+       rateBasisPoints = Value(rateBasisPoints),
+       baseAmount = Value(baseAmount),
+       interestAmount = Value(interestAmount),
+       periodKey = Value(periodKey);
   static Insertable<InterestRecordsTableData> custom({
     Expression<int>? id,
     Expression<int>? storeId,
     Expression<int>? customerId,
-    Expression<double>? rate,
-    Expression<double>? baseAmount,
-    Expression<double>? interestAmount,
+    Expression<int>? rateBasisPoints,
+    Expression<int>? baseAmount,
+    Expression<int>? interestAmount,
+    Expression<String>? periodKey,
     Expression<DateTime>? createdAt,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (storeId != null) 'store_id': storeId,
       if (customerId != null) 'customer_id': customerId,
-      if (rate != null) 'rate': rate,
+      if (rateBasisPoints != null) 'rate_basis_points': rateBasisPoints,
       if (baseAmount != null) 'base_amount': baseAmount,
       if (interestAmount != null) 'interest_amount': interestAmount,
+      if (periodKey != null) 'period_key': periodKey,
       if (createdAt != null) 'created_at': createdAt,
     });
   }
@@ -3317,18 +3431,20 @@ class InterestRecordsTableCompanion
     Value<int>? id,
     Value<int>? storeId,
     Value<int>? customerId,
-    Value<double>? rate,
-    Value<double>? baseAmount,
-    Value<double>? interestAmount,
-    Value<DateTime?>? createdAt,
+    Value<int>? rateBasisPoints,
+    Value<int>? baseAmount,
+    Value<int>? interestAmount,
+    Value<String>? periodKey,
+    Value<DateTime>? createdAt,
   }) {
     return InterestRecordsTableCompanion(
       id: id ?? this.id,
       storeId: storeId ?? this.storeId,
       customerId: customerId ?? this.customerId,
-      rate: rate ?? this.rate,
+      rateBasisPoints: rateBasisPoints ?? this.rateBasisPoints,
       baseAmount: baseAmount ?? this.baseAmount,
       interestAmount: interestAmount ?? this.interestAmount,
+      periodKey: periodKey ?? this.periodKey,
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -3345,14 +3461,17 @@ class InterestRecordsTableCompanion
     if (customerId.present) {
       map['customer_id'] = Variable<int>(customerId.value);
     }
-    if (rate.present) {
-      map['rate'] = Variable<double>(rate.value);
+    if (rateBasisPoints.present) {
+      map['rate_basis_points'] = Variable<int>(rateBasisPoints.value);
     }
     if (baseAmount.present) {
-      map['base_amount'] = Variable<double>(baseAmount.value);
+      map['base_amount'] = Variable<int>(baseAmount.value);
     }
     if (interestAmount.present) {
-      map['interest_amount'] = Variable<double>(interestAmount.value);
+      map['interest_amount'] = Variable<int>(interestAmount.value);
+    }
+    if (periodKey.present) {
+      map['period_key'] = Variable<String>(periodKey.value);
     }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
@@ -3366,9 +3485,10 @@ class InterestRecordsTableCompanion
           ..write('id: $id, ')
           ..write('storeId: $storeId, ')
           ..write('customerId: $customerId, ')
-          ..write('rate: $rate, ')
+          ..write('rateBasisPoints: $rateBasisPoints, ')
           ..write('baseAmount: $baseAmount, ')
           ..write('interestAmount: $interestAmount, ')
+          ..write('periodKey: $periodKey, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -3390,6 +3510,62 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $StoreSettingsTableTable(this);
   late final $InterestRecordsTableTable interestRecordsTable =
       $InterestRecordsTableTable(this);
+  late final Index idxStoreNameCategory = Index(
+    'idx_store_name_category',
+    'CREATE INDEX idx_store_name_category ON stores_table (name, category)',
+  );
+  late final Index idxCustomerStoreName = Index(
+    'idx_customer_store_name',
+    'CREATE INDEX idx_customer_store_name ON customers_table (store_id, name)',
+  );
+  late final Index idxProductStoreName = Index(
+    'idx_product_store_name',
+    'CREATE INDEX idx_product_store_name ON products_table (store_id, name)',
+  );
+  late final Index idxProductStoreBarcode = Index(
+    'idx_product_store_barcode',
+    'CREATE UNIQUE INDEX idx_product_store_barcode ON products_table (store_id, barcode)',
+  );
+  late final Index idxTxnCustomerCreated = Index(
+    'idx_txn_customer_created',
+    'CREATE INDEX idx_txn_customer_created ON transactions_table (customer_id, created_at)',
+  );
+  late final Index idxTxnStoreCreated = Index(
+    'idx_txn_store_created',
+    'CREATE INDEX idx_txn_store_created ON transactions_table (store_id, created_at)',
+  );
+  late final Index idxTxnItemTransaction = Index(
+    'idx_txn_item_transaction',
+    'CREATE INDEX idx_txn_item_transaction ON transactions_item_table (transaction_id)',
+  );
+  late final Index idxTxnItemProduct = Index(
+    'idx_txn_item_product',
+    'CREATE INDEX idx_txn_item_product ON transactions_item_table (product_id)',
+  );
+  late final Index idxPaymentCustomerCreated = Index(
+    'idx_payment_customer_created',
+    'CREATE INDEX idx_payment_customer_created ON payments_table (customer_id, created_at)',
+  );
+  late final Index idxPaymentStoreCreated = Index(
+    'idx_payment_store_created',
+    'CREATE INDEX idx_payment_store_created ON payments_table (store_id, created_at)',
+  );
+  late final Index idxStoreSettingsStore = Index(
+    'idx_store_settings_store',
+    'CREATE UNIQUE INDEX idx_store_settings_store ON store_settings_table (store_id)',
+  );
+  late final Index idxInterestCustomerPeriod = Index(
+    'idx_interest_customer_period',
+    'CREATE UNIQUE INDEX idx_interest_customer_period ON interest_records_table (customer_id, period_key)',
+  );
+  late final Index idxInterestCustomerCreated = Index(
+    'idx_interest_customer_created',
+    'CREATE INDEX idx_interest_customer_created ON interest_records_table (customer_id, created_at)',
+  );
+  late final Index idxInterestStoreCreated = Index(
+    'idx_interest_store_created',
+    'CREATE INDEX idx_interest_store_created ON interest_records_table (store_id, created_at)',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -3403,6 +3579,20 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     paymentsTable,
     storeSettingsTable,
     interestRecordsTable,
+    idxStoreNameCategory,
+    idxCustomerStoreName,
+    idxProductStoreName,
+    idxProductStoreBarcode,
+    idxTxnCustomerCreated,
+    idxTxnStoreCreated,
+    idxTxnItemTransaction,
+    idxTxnItemProduct,
+    idxPaymentCustomerCreated,
+    idxPaymentStoreCreated,
+    idxStoreSettingsStore,
+    idxInterestCustomerPeriod,
+    idxInterestCustomerCreated,
+    idxInterestStoreCreated,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -3429,13 +3619,6 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
-        'customers_table',
-        limitUpdateKind: UpdateKind.delete,
-      ),
-      result: [TableUpdate('transactions_table', kind: UpdateKind.delete)],
-    ),
-    WritePropagation(
-      on: TableUpdateQuery.onTableName(
         'transactions_table',
         limitUpdateKind: UpdateKind.delete,
       ),
@@ -3443,21 +3626,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
-        'products_table',
-        limitUpdateKind: UpdateKind.delete,
-      ),
-      result: [TableUpdate('transactions_item_table', kind: UpdateKind.delete)],
-    ),
-    WritePropagation(
-      on: TableUpdateQuery.onTableName(
         'stores_table',
-        limitUpdateKind: UpdateKind.delete,
-      ),
-      result: [TableUpdate('payments_table', kind: UpdateKind.delete)],
-    ),
-    WritePropagation(
-      on: TableUpdateQuery.onTableName(
-        'customers_table',
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('payments_table', kind: UpdateKind.delete)],
@@ -3476,13 +3645,6 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       ),
       result: [TableUpdate('interest_records_table', kind: UpdateKind.delete)],
     ),
-    WritePropagation(
-      on: TableUpdateQuery.onTableName(
-        'customers_table',
-        limitUpdateKind: UpdateKind.delete,
-      ),
-      result: [TableUpdate('interest_records_table', kind: UpdateKind.delete)],
-    ),
   ]);
 }
 
@@ -3492,7 +3654,7 @@ typedef $$StoresTableTableCreateCompanionBuilder =
       required String name,
       Value<String?> description,
       Value<String?> category,
-      Value<DateTime?> createdAt,
+      Value<DateTime> createdAt,
     });
 typedef $$StoresTableTableUpdateCompanionBuilder =
     StoresTableCompanion Function({
@@ -3500,7 +3662,7 @@ typedef $$StoresTableTableUpdateCompanionBuilder =
       Value<String> name,
       Value<String?> description,
       Value<String?> category,
-      Value<DateTime?> createdAt,
+      Value<DateTime> createdAt,
     });
 
 final class $$StoresTableTableReferences
@@ -4074,7 +4236,7 @@ class $$StoresTableTableTableManager
                 Value<String> name = const Value.absent(),
                 Value<String?> description = const Value.absent(),
                 Value<String?> category = const Value.absent(),
-                Value<DateTime?> createdAt = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
               }) => StoresTableCompanion(
                 id: id,
                 name: name,
@@ -4088,7 +4250,7 @@ class $$StoresTableTableTableManager
                 required String name,
                 Value<String?> description = const Value.absent(),
                 Value<String?> category = const Value.absent(),
-                Value<DateTime?> createdAt = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
               }) => StoresTableCompanion.insert(
                 id: id,
                 name: name,
@@ -4286,18 +4448,18 @@ typedef $$CustomersTableTableCreateCompanionBuilder =
       Value<int> id,
       required int storeId,
       required String name,
-      required String contactNumber,
-      required bool isActive,
-      Value<DateTime?> createdAt,
+      Value<String?> contactNumber,
+      Value<bool> isActive,
+      Value<DateTime> createdAt,
     });
 typedef $$CustomersTableTableUpdateCompanionBuilder =
     CustomersTableCompanion Function({
       Value<int> id,
       Value<int> storeId,
       Value<String> name,
-      Value<String> contactNumber,
+      Value<String?> contactNumber,
       Value<bool> isActive,
-      Value<DateTime?> createdAt,
+      Value<DateTime> createdAt,
     });
 
 final class $$CustomersTableTableReferences
@@ -4754,9 +4916,9 @@ class $$CustomersTableTableTableManager
                 Value<int> id = const Value.absent(),
                 Value<int> storeId = const Value.absent(),
                 Value<String> name = const Value.absent(),
-                Value<String> contactNumber = const Value.absent(),
+                Value<String?> contactNumber = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
-                Value<DateTime?> createdAt = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
               }) => CustomersTableCompanion(
                 id: id,
                 storeId: storeId,
@@ -4770,9 +4932,9 @@ class $$CustomersTableTableTableManager
                 Value<int> id = const Value.absent(),
                 required int storeId,
                 required String name,
-                required String contactNumber,
-                required bool isActive,
-                Value<DateTime?> createdAt = const Value.absent(),
+                Value<String?> contactNumber = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
               }) => CustomersTableCompanion.insert(
                 id: id,
                 storeId: storeId,
@@ -4933,23 +5095,25 @@ typedef $$ProductsTableTableCreateCompanionBuilder =
     ProductsTableCompanion Function({
       Value<int> id,
       required int storeId,
+      Value<String?> barcode,
       required String name,
       Value<String?> description,
-      Value<double> price,
+      required int price,
       required String unit,
-      required bool isActive,
-      Value<DateTime?> createdAt,
+      Value<bool> isActive,
+      Value<DateTime> createdAt,
     });
 typedef $$ProductsTableTableUpdateCompanionBuilder =
     ProductsTableCompanion Function({
       Value<int> id,
       Value<int> storeId,
+      Value<String?> barcode,
       Value<String> name,
       Value<String?> description,
-      Value<double> price,
+      Value<int> price,
       Value<String> unit,
       Value<bool> isActive,
-      Value<DateTime?> createdAt,
+      Value<DateTime> createdAt,
     });
 
 final class $$ProductsTableTableReferences
@@ -5018,6 +5182,11 @@ class $$ProductsTableTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get barcode => $composableBuilder(
+    column: $table.barcode,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get name => $composableBuilder(
     column: $table.name,
     builder: (column) => ColumnFilters(column),
@@ -5028,7 +5197,7 @@ class $$ProductsTableTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<double> get price => $composableBuilder(
+  ColumnFilters<int> get price => $composableBuilder(
     column: $table.price,
     builder: (column) => ColumnFilters(column),
   );
@@ -5112,6 +5281,11 @@ class $$ProductsTableTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get barcode => $composableBuilder(
+    column: $table.barcode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get name => $composableBuilder(
     column: $table.name,
     builder: (column) => ColumnOrderings(column),
@@ -5122,7 +5296,7 @@ class $$ProductsTableTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<double> get price => $composableBuilder(
+  ColumnOrderings<int> get price => $composableBuilder(
     column: $table.price,
     builder: (column) => ColumnOrderings(column),
   );
@@ -5178,6 +5352,9 @@ class $$ProductsTableTableAnnotationComposer
   GeneratedColumn<int> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
+  GeneratedColumn<String> get barcode =>
+      $composableBuilder(column: $table.barcode, builder: (column) => column);
+
   GeneratedColumn<String> get name =>
       $composableBuilder(column: $table.name, builder: (column) => column);
 
@@ -5186,7 +5363,7 @@ class $$ProductsTableTableAnnotationComposer
     builder: (column) => column,
   );
 
-  GeneratedColumn<double> get price =>
+  GeneratedColumn<int> get price =>
       $composableBuilder(column: $table.price, builder: (column) => column);
 
   GeneratedColumn<String> get unit =>
@@ -5278,15 +5455,17 @@ class $$ProductsTableTableTableManager
               ({
                 Value<int> id = const Value.absent(),
                 Value<int> storeId = const Value.absent(),
+                Value<String?> barcode = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<String?> description = const Value.absent(),
-                Value<double> price = const Value.absent(),
+                Value<int> price = const Value.absent(),
                 Value<String> unit = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
-                Value<DateTime?> createdAt = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
               }) => ProductsTableCompanion(
                 id: id,
                 storeId: storeId,
+                barcode: barcode,
                 name: name,
                 description: description,
                 price: price,
@@ -5298,15 +5477,17 @@ class $$ProductsTableTableTableManager
               ({
                 Value<int> id = const Value.absent(),
                 required int storeId,
+                Value<String?> barcode = const Value.absent(),
                 required String name,
                 Value<String?> description = const Value.absent(),
-                Value<double> price = const Value.absent(),
+                required int price,
                 required String unit,
-                required bool isActive,
-                Value<DateTime?> createdAt = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
               }) => ProductsTableCompanion.insert(
                 id: id,
                 storeId: storeId,
+                barcode: barcode,
                 name: name,
                 description: description,
                 price: price,
@@ -5413,18 +5594,18 @@ typedef $$TransactionsTableTableCreateCompanionBuilder =
       Value<int> id,
       required int storeId,
       required int customerId,
-      Value<double> totalAmount,
+      required int totalAmount,
       Value<String?> note,
-      Value<DateTime?> createdAt,
+      Value<DateTime> createdAt,
     });
 typedef $$TransactionsTableTableUpdateCompanionBuilder =
     TransactionsTableCompanion Function({
       Value<int> id,
       Value<int> storeId,
       Value<int> customerId,
-      Value<double> totalAmount,
+      Value<int> totalAmount,
       Value<String?> note,
-      Value<DateTime?> createdAt,
+      Value<DateTime> createdAt,
     });
 
 final class $$TransactionsTableTableReferences
@@ -5516,7 +5697,7 @@ class $$TransactionsTableTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<double> get totalAmount => $composableBuilder(
+  ColumnFilters<int> get totalAmount => $composableBuilder(
     column: $table.totalAmount,
     builder: (column) => ColumnFilters(column),
   );
@@ -5618,7 +5799,7 @@ class $$TransactionsTableTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<double> get totalAmount => $composableBuilder(
+  ColumnOrderings<int> get totalAmount => $composableBuilder(
     column: $table.totalAmount,
     builder: (column) => ColumnOrderings(column),
   );
@@ -5692,7 +5873,7 @@ class $$TransactionsTableTableAnnotationComposer
   GeneratedColumn<int> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
-  GeneratedColumn<double> get totalAmount => $composableBuilder(
+  GeneratedColumn<int> get totalAmount => $composableBuilder(
     column: $table.totalAmount,
     builder: (column) => column,
   );
@@ -5816,9 +5997,9 @@ class $$TransactionsTableTableTableManager
                 Value<int> id = const Value.absent(),
                 Value<int> storeId = const Value.absent(),
                 Value<int> customerId = const Value.absent(),
-                Value<double> totalAmount = const Value.absent(),
+                Value<int> totalAmount = const Value.absent(),
                 Value<String?> note = const Value.absent(),
-                Value<DateTime?> createdAt = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
               }) => TransactionsTableCompanion(
                 id: id,
                 storeId: storeId,
@@ -5832,9 +6013,9 @@ class $$TransactionsTableTableTableManager
                 Value<int> id = const Value.absent(),
                 required int storeId,
                 required int customerId,
-                Value<double> totalAmount = const Value.absent(),
+                required int totalAmount,
                 Value<String?> note = const Value.absent(),
-                Value<DateTime?> createdAt = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
               }) => TransactionsTableCompanion.insert(
                 id: id,
                 storeId: storeId,
@@ -5965,10 +6146,10 @@ typedef $$TransactionsItemTableTableCreateCompanionBuilder =
       Value<int> id,
       required int transactionId,
       required int productId,
-      Value<double> quantity,
-      Value<double> unitPrice,
-      Value<double> subTotal,
-      Value<DateTime?> createdAt,
+      required double quantity,
+      required int unitPrice,
+      required int subTotal,
+      Value<DateTime> createdAt,
     });
 typedef $$TransactionsItemTableTableUpdateCompanionBuilder =
     TransactionsItemTableCompanion Function({
@@ -5976,9 +6157,9 @@ typedef $$TransactionsItemTableTableUpdateCompanionBuilder =
       Value<int> transactionId,
       Value<int> productId,
       Value<double> quantity,
-      Value<double> unitPrice,
-      Value<double> subTotal,
-      Value<DateTime?> createdAt,
+      Value<int> unitPrice,
+      Value<int> subTotal,
+      Value<DateTime> createdAt,
     });
 
 final class $$TransactionsItemTableTableReferences
@@ -6051,12 +6232,12 @@ class $$TransactionsItemTableTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<double> get unitPrice => $composableBuilder(
+  ColumnFilters<int> get unitPrice => $composableBuilder(
     column: $table.unitPrice,
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<double> get subTotal => $composableBuilder(
+  ColumnFilters<int> get subTotal => $composableBuilder(
     column: $table.subTotal,
     builder: (column) => ColumnFilters(column),
   );
@@ -6132,12 +6313,12 @@ class $$TransactionsItemTableTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<double> get unitPrice => $composableBuilder(
+  ColumnOrderings<int> get unitPrice => $composableBuilder(
     column: $table.unitPrice,
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<double> get subTotal => $composableBuilder(
+  ColumnOrderings<int> get subTotal => $composableBuilder(
     column: $table.subTotal,
     builder: (column) => ColumnOrderings(column),
   );
@@ -6209,10 +6390,10 @@ class $$TransactionsItemTableTableAnnotationComposer
   GeneratedColumn<double> get quantity =>
       $composableBuilder(column: $table.quantity, builder: (column) => column);
 
-  GeneratedColumn<double> get unitPrice =>
+  GeneratedColumn<int> get unitPrice =>
       $composableBuilder(column: $table.unitPrice, builder: (column) => column);
 
-  GeneratedColumn<double> get subTotal =>
+  GeneratedColumn<int> get subTotal =>
       $composableBuilder(column: $table.subTotal, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
@@ -6309,9 +6490,9 @@ class $$TransactionsItemTableTableTableManager
                 Value<int> transactionId = const Value.absent(),
                 Value<int> productId = const Value.absent(),
                 Value<double> quantity = const Value.absent(),
-                Value<double> unitPrice = const Value.absent(),
-                Value<double> subTotal = const Value.absent(),
-                Value<DateTime?> createdAt = const Value.absent(),
+                Value<int> unitPrice = const Value.absent(),
+                Value<int> subTotal = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
               }) => TransactionsItemTableCompanion(
                 id: id,
                 transactionId: transactionId,
@@ -6326,10 +6507,10 @@ class $$TransactionsItemTableTableTableManager
                 Value<int> id = const Value.absent(),
                 required int transactionId,
                 required int productId,
-                Value<double> quantity = const Value.absent(),
-                Value<double> unitPrice = const Value.absent(),
-                Value<double> subTotal = const Value.absent(),
-                Value<DateTime?> createdAt = const Value.absent(),
+                required double quantity,
+                required int unitPrice,
+                required int subTotal,
+                Value<DateTime> createdAt = const Value.absent(),
               }) => TransactionsItemTableCompanion.insert(
                 id: id,
                 transactionId: transactionId,
@@ -6428,18 +6609,18 @@ typedef $$PaymentsTableTableCreateCompanionBuilder =
       Value<int> id,
       required int storeId,
       required int customerId,
-      Value<double> amount,
+      required int amount,
       Value<String?> note,
-      Value<DateTime?> createdAt,
+      Value<DateTime> createdAt,
     });
 typedef $$PaymentsTableTableUpdateCompanionBuilder =
     PaymentsTableCompanion Function({
       Value<int> id,
       Value<int> storeId,
       Value<int> customerId,
-      Value<double> amount,
+      Value<int> amount,
       Value<String?> note,
-      Value<DateTime?> createdAt,
+      Value<DateTime> createdAt,
     });
 
 final class $$PaymentsTableTableReferences
@@ -6501,7 +6682,7 @@ class $$PaymentsTableTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<double> get amount => $composableBuilder(
+  ColumnFilters<int> get amount => $composableBuilder(
     column: $table.amount,
     builder: (column) => ColumnFilters(column),
   );
@@ -6577,7 +6758,7 @@ class $$PaymentsTableTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<double> get amount => $composableBuilder(
+  ColumnOrderings<int> get amount => $composableBuilder(
     column: $table.amount,
     builder: (column) => ColumnOrderings(column),
   );
@@ -6651,7 +6832,7 @@ class $$PaymentsTableTableAnnotationComposer
   GeneratedColumn<int> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
-  GeneratedColumn<double> get amount =>
+  GeneratedColumn<int> get amount =>
       $composableBuilder(column: $table.amount, builder: (column) => column);
 
   GeneratedColumn<String> get note =>
@@ -6738,9 +6919,9 @@ class $$PaymentsTableTableTableManager
                 Value<int> id = const Value.absent(),
                 Value<int> storeId = const Value.absent(),
                 Value<int> customerId = const Value.absent(),
-                Value<double> amount = const Value.absent(),
+                Value<int> amount = const Value.absent(),
                 Value<String?> note = const Value.absent(),
-                Value<DateTime?> createdAt = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
               }) => PaymentsTableCompanion(
                 id: id,
                 storeId: storeId,
@@ -6754,9 +6935,9 @@ class $$PaymentsTableTableTableManager
                 Value<int> id = const Value.absent(),
                 required int storeId,
                 required int customerId,
-                Value<double> amount = const Value.absent(),
+                required int amount,
                 Value<String?> note = const Value.absent(),
-                Value<DateTime?> createdAt = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
               }) => PaymentsTableCompanion.insert(
                 id: id,
                 storeId: storeId,
@@ -6850,14 +7031,14 @@ typedef $$StoreSettingsTableTableCreateCompanionBuilder =
       Value<int> id,
       required int storeId,
       Value<bool> monthlyInterestEnabled,
-      Value<double> monthlyInterestRate,
+      Value<int> monthlyInterestRateBasisPoints,
     });
 typedef $$StoreSettingsTableTableUpdateCompanionBuilder =
     StoreSettingsTableCompanion Function({
       Value<int> id,
       Value<int> storeId,
       Value<bool> monthlyInterestEnabled,
-      Value<double> monthlyInterestRate,
+      Value<int> monthlyInterestRateBasisPoints,
     });
 
 final class $$StoreSettingsTableTableReferences
@@ -6910,8 +7091,8 @@ class $$StoreSettingsTableTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<double> get monthlyInterestRate => $composableBuilder(
-    column: $table.monthlyInterestRate,
+  ColumnFilters<int> get monthlyInterestRateBasisPoints => $composableBuilder(
+    column: $table.monthlyInterestRateBasisPoints,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6958,8 +7139,8 @@ class $$StoreSettingsTableTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<double> get monthlyInterestRate => $composableBuilder(
-    column: $table.monthlyInterestRate,
+  ColumnOrderings<int> get monthlyInterestRateBasisPoints => $composableBuilder(
+    column: $table.monthlyInterestRateBasisPoints,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -7004,8 +7185,8 @@ class $$StoreSettingsTableTableAnnotationComposer
     builder: (column) => column,
   );
 
-  GeneratedColumn<double> get monthlyInterestRate => $composableBuilder(
-    column: $table.monthlyInterestRate,
+  GeneratedColumn<int> get monthlyInterestRateBasisPoints => $composableBuilder(
+    column: $table.monthlyInterestRateBasisPoints,
     builder: (column) => column,
   );
 
@@ -7069,24 +7250,26 @@ class $$StoreSettingsTableTableTableManager
                 Value<int> id = const Value.absent(),
                 Value<int> storeId = const Value.absent(),
                 Value<bool> monthlyInterestEnabled = const Value.absent(),
-                Value<double> monthlyInterestRate = const Value.absent(),
+                Value<int> monthlyInterestRateBasisPoints =
+                    const Value.absent(),
               }) => StoreSettingsTableCompanion(
                 id: id,
                 storeId: storeId,
                 monthlyInterestEnabled: monthlyInterestEnabled,
-                monthlyInterestRate: monthlyInterestRate,
+                monthlyInterestRateBasisPoints: monthlyInterestRateBasisPoints,
               ),
           createCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
                 required int storeId,
                 Value<bool> monthlyInterestEnabled = const Value.absent(),
-                Value<double> monthlyInterestRate = const Value.absent(),
+                Value<int> monthlyInterestRateBasisPoints =
+                    const Value.absent(),
               }) => StoreSettingsTableCompanion.insert(
                 id: id,
                 storeId: storeId,
                 monthlyInterestEnabled: monthlyInterestEnabled,
-                monthlyInterestRate: monthlyInterestRate,
+                monthlyInterestRateBasisPoints: monthlyInterestRateBasisPoints,
               ),
           withReferenceMapper: (p0) => p0
               .map(
@@ -7162,20 +7345,22 @@ typedef $$InterestRecordsTableTableCreateCompanionBuilder =
       Value<int> id,
       required int storeId,
       required int customerId,
-      Value<double> rate,
-      Value<double> baseAmount,
-      Value<double> interestAmount,
-      Value<DateTime?> createdAt,
+      required int rateBasisPoints,
+      required int baseAmount,
+      required int interestAmount,
+      required String periodKey,
+      Value<DateTime> createdAt,
     });
 typedef $$InterestRecordsTableTableUpdateCompanionBuilder =
     InterestRecordsTableCompanion Function({
       Value<int> id,
       Value<int> storeId,
       Value<int> customerId,
-      Value<double> rate,
-      Value<double> baseAmount,
-      Value<double> interestAmount,
-      Value<DateTime?> createdAt,
+      Value<int> rateBasisPoints,
+      Value<int> baseAmount,
+      Value<int> interestAmount,
+      Value<String> periodKey,
+      Value<DateTime> createdAt,
     });
 
 final class $$InterestRecordsTableTableReferences
@@ -7241,18 +7426,23 @@ class $$InterestRecordsTableTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<double> get rate => $composableBuilder(
-    column: $table.rate,
+  ColumnFilters<int> get rateBasisPoints => $composableBuilder(
+    column: $table.rateBasisPoints,
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<double> get baseAmount => $composableBuilder(
+  ColumnFilters<int> get baseAmount => $composableBuilder(
     column: $table.baseAmount,
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<double> get interestAmount => $composableBuilder(
+  ColumnFilters<int> get interestAmount => $composableBuilder(
     column: $table.interestAmount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get periodKey => $composableBuilder(
+    column: $table.periodKey,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -7322,18 +7512,23 @@ class $$InterestRecordsTableTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<double> get rate => $composableBuilder(
-    column: $table.rate,
+  ColumnOrderings<int> get rateBasisPoints => $composableBuilder(
+    column: $table.rateBasisPoints,
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<double> get baseAmount => $composableBuilder(
+  ColumnOrderings<int> get baseAmount => $composableBuilder(
     column: $table.baseAmount,
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<double> get interestAmount => $composableBuilder(
+  ColumnOrderings<int> get interestAmount => $composableBuilder(
     column: $table.interestAmount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get periodKey => $composableBuilder(
+    column: $table.periodKey,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -7401,18 +7596,23 @@ class $$InterestRecordsTableTableAnnotationComposer
   GeneratedColumn<int> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
-  GeneratedColumn<double> get rate =>
-      $composableBuilder(column: $table.rate, builder: (column) => column);
+  GeneratedColumn<int> get rateBasisPoints => $composableBuilder(
+    column: $table.rateBasisPoints,
+    builder: (column) => column,
+  );
 
-  GeneratedColumn<double> get baseAmount => $composableBuilder(
+  GeneratedColumn<int> get baseAmount => $composableBuilder(
     column: $table.baseAmount,
     builder: (column) => column,
   );
 
-  GeneratedColumn<double> get interestAmount => $composableBuilder(
+  GeneratedColumn<int> get interestAmount => $composableBuilder(
     column: $table.interestAmount,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get periodKey =>
+      $composableBuilder(column: $table.periodKey, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -7503,17 +7703,19 @@ class $$InterestRecordsTableTableTableManager
                 Value<int> id = const Value.absent(),
                 Value<int> storeId = const Value.absent(),
                 Value<int> customerId = const Value.absent(),
-                Value<double> rate = const Value.absent(),
-                Value<double> baseAmount = const Value.absent(),
-                Value<double> interestAmount = const Value.absent(),
-                Value<DateTime?> createdAt = const Value.absent(),
+                Value<int> rateBasisPoints = const Value.absent(),
+                Value<int> baseAmount = const Value.absent(),
+                Value<int> interestAmount = const Value.absent(),
+                Value<String> periodKey = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
               }) => InterestRecordsTableCompanion(
                 id: id,
                 storeId: storeId,
                 customerId: customerId,
-                rate: rate,
+                rateBasisPoints: rateBasisPoints,
                 baseAmount: baseAmount,
                 interestAmount: interestAmount,
+                periodKey: periodKey,
                 createdAt: createdAt,
               ),
           createCompanionCallback:
@@ -7521,17 +7723,19 @@ class $$InterestRecordsTableTableTableManager
                 Value<int> id = const Value.absent(),
                 required int storeId,
                 required int customerId,
-                Value<double> rate = const Value.absent(),
-                Value<double> baseAmount = const Value.absent(),
-                Value<double> interestAmount = const Value.absent(),
-                Value<DateTime?> createdAt = const Value.absent(),
+                required int rateBasisPoints,
+                required int baseAmount,
+                required int interestAmount,
+                required String periodKey,
+                Value<DateTime> createdAt = const Value.absent(),
               }) => InterestRecordsTableCompanion.insert(
                 id: id,
                 storeId: storeId,
                 customerId: customerId,
-                rate: rate,
+                rateBasisPoints: rateBasisPoints,
                 baseAmount: baseAmount,
                 interestAmount: interestAmount,
+                periodKey: periodKey,
                 createdAt: createdAt,
               ),
           withReferenceMapper: (p0) => p0

@@ -14,6 +14,10 @@
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
+	<!-- Required by mobile_scanner. iOS terminates the app on camera access
+	     if this key is absent, so it is not optional even though scanning is. -->
+	<key>NSCameraUsageDescription</key>
+	<string>UtangLista uses the camera to scan product barcodes so you can add and find products quickly.</string>
 	<key>CFBundleName</key>
 	<string>utanglista_mobileapp</string>
 	<key>CFBundlePackageType</key>

@@ -38,14 +38,16 @@ Future<T> repositoryGuard<T>(
 }) async {
   try {
     return await action();
-  } on AppFailure catch (e) {
+  } on AppFailure {
+    // Already a domain failure with a specific code — passing it through
+    // untouched is the point, so it never gets downgraded to a generic one.
     rethrow;
   } on DriftWrappedException catch (e) {
     debugPrint("Drift Error: ${e.message}");
     debugPrint("Native Database Failure: ${e.cause}");
     throw AppFailure(code: 'DRIFT_ERROR', message: failureMessage);
   } catch (e) {
-    print('Generic or unexpected error: $e');
+    debugPrint('Generic or unexpected error: $e');
     throw AppFailure(code: 'UNEXPECTED_ERROR', message: failureMessage);
   }
 }
@@ -71,7 +73,7 @@ Future<T> repositoryGuard<T>(
       notFoundMessage: 'This batch no longer exists.',
     );
 */
-Future<void> requireRowChanged(
+Future<int> requireRowChanged(
   Future<int> Function() action, {
   required String failureMessage,
   required String notFoundMessage,
@@ -84,4 +86,6 @@ Future<void> requireRowChanged(
   if (rowsAffected == 0) {
     throw AppFailure(code: 'NOT_FOUND', message: notFoundMessage);
   }
+
+  return rowsAffected;
 }

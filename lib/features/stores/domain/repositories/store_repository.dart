@@ -6,9 +6,9 @@ import 'package:utanglista_mobileapp/features/stores/domain/entities/store_entit
 abstract class StoreRepository {
   Future<int> createStore(StorePayloadModel payload);
   Future<StoreEntity?> fetchStoreById(int storeId);
-  Future<List<StoreEntity>> fetchStores();
-  Future<void> updateStore(UpdateStorePayloadModel updatePayload);
-  Future<void> deleteStore(int storeId);
+  Future<List<StoreEntity>> fetchStores(String? category);
+  Future<int> updateStore(UpdateStorePayloadModel updatePayload);
+  Future<int> deleteStore(int storeId);
 }
 
 class StoreRepositoryImplementation implements StoreRepository {
@@ -37,9 +37,9 @@ class StoreRepositoryImplementation implements StoreRepository {
   }
 
   @override
-  Future<List<StoreEntity>> fetchStores() {
+  Future<List<StoreEntity>> fetchStores(String? category) {
     return repositoryGuard(() async {
-      final storesModel = await localDataSource.fetchStores();
+      final storesModel = await localDataSource.fetchStores(category);
       final stores = storesModel.map((model) => model.toEntity()).toList();
 
       return stores;
@@ -47,7 +47,7 @@ class StoreRepositoryImplementation implements StoreRepository {
   }
 
   @override
-  Future<void> updateStore(UpdateStorePayloadModel updatePayload) {
+  Future<int> updateStore(UpdateStorePayloadModel updatePayload) {
     return requireRowChanged(
       () {
         return localDataSource.updateStore(updatePayload);
@@ -58,7 +58,7 @@ class StoreRepositoryImplementation implements StoreRepository {
   }
 
   @override
-  Future<void> deleteStore(int storeId) {
+  Future<int> deleteStore(int storeId) {
     return requireRowChanged(
       () {
         return localDataSource.deleteStore(storeId);
