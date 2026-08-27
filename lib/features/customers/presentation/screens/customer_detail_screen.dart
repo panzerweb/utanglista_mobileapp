@@ -7,7 +7,6 @@ import 'package:utanglista_mobileapp/core/shared/app_confirm_dialog.dart';
 import 'package:utanglista_mobileapp/core/shared/app_snack_bar.dart';
 import 'package:utanglista_mobileapp/core/shared/views/app_error_view.dart';
 import 'package:utanglista_mobileapp/core/shared/views/app_loading_view.dart';
-import 'package:utanglista_mobileapp/core/shared/views/empty_state_view.dart';
 import 'package:utanglista_mobileapp/core/styles/app_palette.dart';
 import 'package:utanglista_mobileapp/core/styles/app_text_styles.dart';
 import 'package:utanglista_mobileapp/core/utils/app_date_format.dart';
@@ -15,6 +14,8 @@ import 'package:utanglista_mobileapp/features/customers/domain/entities/customer
 import 'package:utanglista_mobileapp/features/customers/domain/entities/customer_entity.dart';
 import 'package:utanglista_mobileapp/features/customers/presentation/bloc/customer_cubit.dart';
 import 'package:utanglista_mobileapp/features/customers/presentation/bloc/customer_state.dart';
+import 'package:utanglista_mobileapp/features/ledger/presentation/screens/ledger_tab.dart';
+import 'package:utanglista_mobileapp/features/payments/presentation/screens/payments_tab.dart';
 import 'package:utanglista_mobileapp/features/transactions/presentation/screens/transactions_tab.dart';
 
 /*
@@ -24,8 +25,7 @@ import 'package:utanglista_mobileapp/features/transactions/presentation/screens/
 
   Three tabs, matching the three kinds of financial event in §17:
   the merged Ledger, the Utang that added to it, and the Payments that
-  reduced it. All three are filled in by Phases 4-5; the balance
-  header above them is real now.
+  reduced it. All three are real as of Phase 5.
 */
 class CustomerDetailScreen extends StatelessWidget {
   final int storeId;
@@ -77,6 +77,22 @@ class _CustomerDetailView extends StatelessWidget {
     await context.push(
       AppRoutes.newTransaction(storeId),
       extra: TransactionBuilderRequest(customerId: customerId),
+    );
+
+    if (context.mounted) await cubit.loadCustomer(customerId);
+  }
+
+  /// §23's screen. Reloads on return so the header, the ledger and the
+  /// payment cap all agree immediately afterwards.
+  Future<void> _recordPayment(
+    BuildContext context,
+    CustomerEntity customer,
+  ) async {
+    final cubit = context.read<CustomerDetailCubit>();
+
+    await context.push(
+      AppRoutes.newPayment(storeId, customerId),
+      extra: RecordPaymentRequest(customerName: customer.name),
     );
 
     if (context.mounted) await cubit.loadCustomer(customerId);
@@ -188,18 +204,42 @@ class _CustomerDetailView extends StatelessWidget {
             length: 3,
             child: Scaffold(
               backgroundColor: AppPalette.background,
-              floatingActionButton: customer.isActive
-                  ? FloatingActionButton.extended(
+              floatingActionButton: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  /*
+                    Paying is offered only when there is something to
+                    pay (§23) — and it stays available for a
+                    DEACTIVATED customer, because settling an old debt
+                    is exactly what a deactivated account still needs
+                    to be able to do.
+                  */
+                  if (state.balance.hasDebt)
+                    FloatingActionButton.extended(
+                      heroTag: 'record-payment',
+                      onPressed: () => _recordPayment(context, customer),
+                      backgroundColor: AppPalette.success,
+                      foregroundColor: AppPalette.surface,
+                      icon: const Icon(Icons.payments_outlined),
+                      label: const Text('Record payment'),
+                    ),
+
+                  const SizedBox(height: 10),
+
+                  // §29: a deactivated customer cannot take new utang,
+                  // so the action is absent rather than disabled.
+                  if (customer.isActive)
+                    FloatingActionButton.extended(
                       heroTag: 'record-utang',
                       onPressed: () => _recordUtang(context),
                       backgroundColor: AppPalette.primaryDark,
                       foregroundColor: AppPalette.surface,
                       icon: const Icon(Icons.add_shopping_cart_rounded),
                       label: const Text('New utang'),
-                    )
-                  // §29: a deactivated customer cannot take new utang,
-                  // so the action is absent rather than disabled.
-                  : null,
+                    ),
+                ],
+              ),
               appBar: AppBar(
                 backgroundColor: AppPalette.primaryDark,
                 foregroundColor: AppPalette.surface,
@@ -243,13 +283,9 @@ class _CustomerDetailView extends StatelessWidget {
                   Expanded(
                     child: TabBarView(
                       children: [
-                        const _ComingSoonTab(
-                          icon: Icons.receipt_long_outlined,
-                          title: 'Ledger',
-                          message:
-                              'Every utang, payment and interest charge in '
-                              'order, with the running balance.',
-                          phase: 'Phase 5',
+                        LedgerTab(
+                          storeId: storeId,
+                          customerId: customerId,
                         ),
                         TransactionsTab(
                           storeId: storeId,
@@ -257,11 +293,9 @@ class _CustomerDetailView extends StatelessWidget {
                           // The screen's own FAB records the utang.
                           showAddButton: false,
                         ),
-                        const _ComingSoonTab(
-                          icon: Icons.payments_outlined,
-                          title: 'Payments',
-                          message: 'Money received from this customer.',
-                          phase: 'Phase 5',
+                        PaymentsTab(
+                          storeId: storeId,
+                          customerId: customerId,
                         ),
                       ],
                     ),
@@ -530,29 +564,6 @@ class _BreakdownCell extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _ComingSoonTab extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String message;
-  final String phase;
-
-  const _ComingSoonTab({
-    required this.icon,
-    required this.title,
-    required this.message,
-    required this.phase,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return EmptyStateView(
-      icon: icon,
-      title: '$title — coming in $phase',
-      message: message,
     );
   }
 }

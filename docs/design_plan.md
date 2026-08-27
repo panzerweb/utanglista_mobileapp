@@ -8,7 +8,7 @@ built, in what order, and which decisions are still open.
 
 ## 1. Where the codebase stands today
 
-*Updated at the end of Phase 4.*
+*Updated at the end of Phase 5.*
 
 | Area | Status |
 |---|---|
@@ -22,9 +22,11 @@ built, in what order, and which decisions are still open.
 | Customers slice + screens | ✅ Phase 2 |
 | Products slice + screens + barcode flows | ✅ Phase 3 |
 | Transactions slice, builder, history, detail | ✅ Phase 4 |
+| Payments slice + §23 guard | ✅ Phase 5 |
+| Ledger read model (§17) | ✅ Phase 5 |
 | Routing (all screens on go_router) | ✅ |
-| DI registrations | ✅ Stores, balances, customers, products, transactions |
-| Payments / Ledger / Interest | ⬜ Phases 5–6 |
+| DI registrations | ✅ All slices wired |
+| Interest application job | ⬜ Phase 6 — table and period guard exist |
 | Dashboard screen | ⬜ Placeholder — Phase 7 |
 
 **The store slice is the reference implementation.** Every other feature is built by
@@ -422,31 +424,50 @@ Marking the method `async` makes every failure arrive as a rejected Future, the 
 **Not verified:** no widget tests — the builder's interaction flow is covered by logic
 tests and a build only.
 
-### Phase 5 — Payments + Ledger
+### Phase 5 — Payments + Ledger ✅ COMPLETE
 
 **Goal:** money comes back in, and the ledger tells the whole story.
 
-- `RecordPaymentScreen` — amount, date, optional note
-- **Overpayment guard (§23):** the payment amount is validated against a *freshly read*
-  balance inside the same DB transaction as the insert, so two quick payments cannot race
-  past the balance. Rejection surfaces as `AppFailure(code: 'OVERPAYMENT')` with the
-  actual outstanding amount in the message. A "Pay full balance" shortcut fills the exact
-  figure.
-- Payment history per customer
-- **Customer Ledger tab** — chronological merge of transactions, payments and interest
-  records into one list with a running balance, exactly as §17 lays out:
+- [x] Payments slice — recorded and read, never edited or deleted (§30)
+- [x] `RecordPaymentScreen` with a "Pay full balance" shortcut
+- [x] **§23 overpayment guard inside the same DB transaction as the insert**
+- [x] Payment history per store and per customer
+- [x] **Customer Ledger tab** — transactions, payments and interest merged into one
+      chronological list with a running balance (§17), built from one `UNION ALL`
+- [x] Customer detail gains a "Record payment" action, shown only when something is owed
 
-  ```text
-  Aug 20   UTANG      5 × Rice            +₱500.00    ₱500.00
-  Aug 22   PAYMENT    Partial payment     −₱200.00    ₱300.00
-  Aug 23   INTEREST   Monthly (2%)          +₱9.00    ₱309.00
-  ```
+**Done:** `flutter analyze` clean, 199/199 tests pass, debug APK builds.
 
-  Built in the domain layer as a `LedgerEntry` union over the three sources. No ledger
-  table (§17).
-- Payments are never deleted in V1 (§30).
+**The overpayment race, and why the guard is in the datasource.** The obvious
+implementation reads the balance, compares, then inserts — and two taps both read ₱500,
+both pass, and the balance lands at −₱500, a state §23 says is impossible. So the balance
+is read and the payment inserted inside one `database.transaction { }`. Two tests fire
+concurrent payments without awaiting: two × ₱500 against ₱500 → exactly one succeeds;
+five × ₱200 against ₱500 → exactly two succeed, balance ₱100, never negative.
 
----
+This is the one place in the app where the §15 formula is written twice — once in
+`CustomerBalance`, once inside the payment transaction. That duplication is accepted
+because the alternative is a race on the app's most sensitive write; the datasource says
+so in a comment.
+
+**The ledger sorts on three keys, not one.** Drift stores `DateTime` as unix seconds, so
+an utang and the payment settling it at the counter carry the identical timestamp.
+Ordering by time alone leaves them tied — and if the payment sorted first, the ledger
+would show a momentarily *negative* balance for a customer who never owed one. Within the
+same second: utang, then interest, then payments. `sourceId` breaks any remaining tie.
+
+**A test that was wrong, not the code.** The first §36 run asserted the day-by-day running
+balance while inserting all five events in the same second, so the same-second rule
+reordered them. The ledger was right; the test now dates the records across the four days
+§36 describes, which is what multi-day ordering is actually for. The same-second case has
+its own test.
+
+**Rendered newest-first, computed oldest-first.** A running balance only means anything
+read forwards, but the seller opened the screen to see what is owed *now* — so the fold
+runs oldest-first and the list is reversed, putting the current balance on the top row.
+
+**Not verified:** no widget tests. The concurrency guard is proven at the repository level,
+not through the UI.
 
 ### Phase 6 — Interest
 

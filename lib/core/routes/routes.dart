@@ -5,6 +5,7 @@ import 'package:utanglista_mobileapp/core/shared/scanner/barcode_scanner_screen.
 import 'package:utanglista_mobileapp/features/customers/presentation/screens/customer_detail_screen.dart';
 import 'package:utanglista_mobileapp/features/customers/presentation/screens/customer_form_screen.dart';
 import 'package:utanglista_mobileapp/features/dashboard_screen.dart';
+import 'package:utanglista_mobileapp/features/payments/presentation/screens/record_payment_screen.dart';
 import 'package:utanglista_mobileapp/features/products/presentation/screens/product_form_screen.dart';
 import 'package:utanglista_mobileapp/features/home_screen.dart';
 import 'package:utanglista_mobileapp/features/stores/presentation/screens/store_detail_screen.dart';
@@ -93,6 +94,9 @@ abstract final class AppRoutes {
       '/stores/$storeId/transactions/new';
   static String transactionDetail(int storeId, int transactionId) =>
       '/stores/$storeId/transactions/$transactionId';
+
+  static String newPayment(int storeId, int customerId) =>
+      '/stores/$storeId/customers/$customerId/payments/new';
 }
 
 final router = GoRouter(
@@ -214,6 +218,32 @@ final router = GoRouter(
                       order, so the reverse would parse "new" as a
                       customer id.
                     */
+                    /*
+                      Full-screen: recording money received deserves
+                      the same focus as building a cart.
+                    */
+                    GoRoute(
+                      path: 'customers/:customerId/payments/new',
+                      parentNavigatorKey: _routerKey,
+                      builder: (context, state) {
+                        final ids = _storeAndCustomerIds(state);
+
+                        if (ids == null) {
+                          return const _InvalidRouteScreen(
+                            message: 'That customer link is not valid.',
+                          );
+                        }
+
+                        final request = state.extra as RecordPaymentRequest?;
+
+                        return RecordPaymentScreen(
+                          storeId: ids.$1,
+                          customerId: ids.$2,
+                          customerName: request?.customerName,
+                        );
+                      },
+                    ),
+
                     /*
                       The builder is full-screen (parentNavigatorKey):
                       a half-built cart is exactly the kind of work the
@@ -419,6 +449,14 @@ class TransactionBuilderRequest {
   final int? customerId;
 
   const TransactionBuilderRequest({this.customerId});
+}
+
+/// Lets the payment screen show the customer's name while the balance
+/// is still loading, instead of a blank header.
+class RecordPaymentRequest {
+  final String? customerName;
+
+  const RecordPaymentRequest({this.customerName});
 }
 
 /*

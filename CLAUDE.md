@@ -334,46 +334,46 @@ the one before it.
 
 ## 7. Status
 
-**Phases 0-4 are complete.** `flutter analyze` is clean and 177 tests pass, including the
-`transaction_logic.md` §36 worked example — as pure arithmetic, through raw SQL, and now
-through the real transaction write path.
+**Phases 0-5 are complete.** `flutter analyze` is clean and 199 tests pass. The
+`transaction_logic.md` §36 worked example now runs end to end — utang, payment, interest,
+and the ledger's running balance column — alongside pure-arithmetic and raw-SQL versions.
 
 - **Phase 0** — schema corrections, `Money`, `CustomerBalance`, shared views, the scanner.
 - **Phase 1** — Stores tab, store form with optional interest, store detail tab shell.
 - **Phase 2** — Customers tab, customer detail with the §15 breakdown, deactivate rules.
 - **Phase 3** — Products tab, scan-to-find and scan-to-add, `MoneyTextField`.
 - **Phase 4** — Transaction builder, atomic write, history and read-only detail.
+- **Phase 5** — Payments with the §23 guard, and the §17 ledger.
 
 Rules established along the way that later phases must not relitigate:
 
-- **`CustomerBalance` is the only balance formula.** Load it through
-  `CustomerBalanceRepository` — `fetchBalancesForStore` for lists (one batched query, never
-  one per row), `fetchBalanceForCustomer` for detail and validation.
+- **`CustomerBalance` is the only balance formula** — with ONE deliberate exception: the
+  payment datasource recomputes it inside its own transaction, because a balance read
+  outside the write's transaction can go stale and §23 would then be unenforceable. That
+  exception is documented at both sites and must not be copied elsewhere.
 - **`Money` for every peso amount, `MoneyTextField` for every peso input.**
 - **`InterestRate`** owns the §19 0%-5% range as basis points. Validate via `isValid`.
-- **Order by `(createdAt, id)`, never `createdAt` alone.** Drift stores `DateTime` as unix
-  *seconds*, so same-second rows tie and SQLite may return them in any order. The Phase 5
-  ledger merges three tables by date and needs the same tiebreaker.
 - **Multi-record financial writes go in one `database.transaction { }`**, with the
-  referential and total checks INSIDE it (§10, §33). Checking outside means checking
-  against a database that can change before the write lands.
+  referential, balance and total checks INSIDE it (§10, §23, §33).
+- **Order by `(createdAt, id)`, never `createdAt` alone**; the ledger additionally orders
+  by kind (utang → interest → payment) so a same-second pair cannot show a negative
+  running balance.
 - **A repository method that validates before awaiting must be `async`**, or the failure
   throws synchronously and never reaches the caller's `.catchError`.
-- **Deactivate, never delete, anything with financial history** (§28, §29, §30). Hide the
-  delete action rather than disabling it, and let the repository refuse it too.
+- **Deactivate, never delete, anything with financial history** (§28, §29, §30). A
+  deactivated customer can still *pay* — §29 stops new utang, not repayment.
 - **An update that changes no column of its own table must not report NOT_FOUND.**
 - **Any list with a search field needs a sequence guard**, not just a debounce.
 - **A scanned barcode has three outcomes, not two:** found-active, found-inactive,
-  not-found. Never collapse found-inactive into not-found.
-- **Barcodes are optional everywhere**; the unique `(storeId, barcode)` index permits many
-  NULLs precisely so unbarcoded goods can coexist.
+  not-found.
 - **`transaction_items.unitPrice` is a snapshot taken when the line is added** (§7).
-  Nothing may read a product's current price to display what something cost.
+- **Payments and transactions are never edited or deleted** (§14, §30, §31). The absent
+  actions are the rule; both detail screens say so rather than just omitting a button.
 
-**Next: Phase 5 (Payments + Ledger).** The overpayment guard (§23) must read the balance
-and insert the payment inside ONE database transaction, or two quick payments can race
-past the balance. The ledger merges transactions, payments and interest records into one
-chronological list with a running balance (§17) — no ledger table.
+**Next: Phase 6 (Interest).** The store settings tab already displays the rate; Phase 6
+adds the application job. The unique `(customerId, periodKey)` index already makes §22
+a database guarantee — the work is the preview, the confirmation, and the per-store /
+per-customer interest history.
 
 ### Carried into later phases
 

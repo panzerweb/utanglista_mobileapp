@@ -5,6 +5,12 @@ import 'package:utanglista_mobileapp/features/customers/data/datasource/customer
 import 'package:utanglista_mobileapp/features/customers/domain/repositories/customer_balance_repository.dart';
 import 'package:utanglista_mobileapp/features/customers/domain/repositories/customer_repository.dart';
 import 'package:utanglista_mobileapp/features/customers/presentation/bloc/customer_cubit.dart';
+import 'package:utanglista_mobileapp/features/ledger/data/datasource/ledger_local_data_source.dart';
+import 'package:utanglista_mobileapp/features/ledger/domain/repositories/ledger_repository.dart';
+import 'package:utanglista_mobileapp/features/ledger/presentation/bloc/ledger_cubit.dart';
+import 'package:utanglista_mobileapp/features/payments/data/datasource/payment_local_data_source.dart';
+import 'package:utanglista_mobileapp/features/payments/domain/repositories/payment_repository.dart';
+import 'package:utanglista_mobileapp/features/payments/presentation/bloc/payment_cubit.dart';
 import 'package:utanglista_mobileapp/features/products/data/datasource/product_local_data_source.dart';
 import 'package:utanglista_mobileapp/features/products/domain/repositories/product_repository.dart';
 import 'package:utanglista_mobileapp/features/products/presentation/bloc/product_cubit.dart';
@@ -199,5 +205,51 @@ void setupLocator() {
       locator<TransactionRepository>(),
       storeId: storeId,
     ),
+  );
+
+  // ========================================================
+  // ** PAYMENTS **
+  // ========================================================
+  locator.registerLazySingleton<PaymentLocalDataSource>(
+    () => PaymentLocalDataSourceImplementation(locator<AppDatabase>()),
+  );
+
+  locator.registerLazySingleton<PaymentRepository>(
+    () => PaymentRepositoryImplementation(locator<PaymentLocalDataSource>()),
+  );
+
+  locator.registerFactoryParam<PaymentListCubit, int, int?>(
+    (storeId, customerId) => PaymentListCubit(
+      locator<PaymentRepository>(),
+      storeId: storeId,
+      customerId: customerId,
+    ),
+  );
+
+  locator.registerFactoryParam<RecordPaymentCubit, int, int>(
+    (storeId, customerId) => RecordPaymentCubit(
+      locator<PaymentRepository>(),
+      locator<CustomerBalanceRepository>(),
+      storeId: storeId,
+      customerId: customerId,
+    ),
+  );
+
+  // ========================================================
+  // ** LEDGER **
+  // A read model over transactions, payments and interest (§17) —
+  // its own slice because it belongs to none of the three.
+  // ========================================================
+  locator.registerLazySingleton<LedgerLocalDataSource>(
+    () => LedgerLocalDataSourceImplementation(locator<AppDatabase>()),
+  );
+
+  locator.registerLazySingleton<LedgerRepository>(
+    () => LedgerRepositoryImplementation(locator<LedgerLocalDataSource>()),
+  );
+
+  locator.registerFactoryParam<LedgerCubit, int, void>(
+    (customerId, _) =>
+        LedgerCubit(locator<LedgerRepository>(), customerId: customerId),
   );
 }
