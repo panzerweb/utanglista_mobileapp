@@ -21,6 +21,7 @@ dependencies:
   intl: ^0.20.3
   mobile_scanner: ^7.4.0
   path_provider: ^2.1.6
+  rename_app: ^1.6.6
   share_plus: ^13.3.0
 
 dev_dependencies:
