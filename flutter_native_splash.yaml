@@ -1,0 +1,8 @@
+flutter_native_splash:
+  color: "#176B45"
+  image: assets/UtangLista-Splash.png
+  fullscreen: true
+
+  android_12:
+    color: "#176B45"
+    image: assets/UtangLista-Splash-Android12.png

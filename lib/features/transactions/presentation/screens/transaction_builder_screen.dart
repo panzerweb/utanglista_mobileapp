@@ -8,6 +8,7 @@ import 'package:utanglista_mobileapp/core/styles/app_palette.dart';
 import 'package:utanglista_mobileapp/core/styles/app_text_styles.dart';
 import 'package:utanglista_mobileapp/features/customers/domain/entities/customer_entity.dart';
 import 'package:utanglista_mobileapp/features/customers/domain/repositories/customer_repository.dart';
+import 'package:utanglista_mobileapp/features/stores/presentation/bloc/store_cubit.dart';
 import 'package:utanglista_mobileapp/features/transactions/domain/entities/transaction_draft.dart';
 import 'package:utanglista_mobileapp/features/transactions/presentation/bloc/transaction_cubit.dart';
 import 'package:utanglista_mobileapp/features/transactions/presentation/bloc/transaction_state.dart';
@@ -473,9 +474,7 @@ class _EmptyCart extends StatelessWidget {
           Text(
             'Search, scan, or quick add what they are taking.',
             textAlign: TextAlign.center,
-            style: AppTextStyles.caption1.copyWith(
-              color: AppPalette.textMuted,
-            ),
+            style: AppTextStyles.caption1.copyWith(color: AppPalette.textMuted),
           ),
           const SizedBox(height: 18),
           FilledButton.icon(
@@ -485,10 +484,7 @@ class _EmptyCart extends StatelessWidget {
             style: FilledButton.styleFrom(
               backgroundColor: AppPalette.primaryDark,
               foregroundColor: AppPalette.surface,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 24,
-                vertical: 12,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),

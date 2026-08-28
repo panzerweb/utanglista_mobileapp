@@ -363,9 +363,7 @@ class _SettingsTab extends StatelessWidget {
               FilledButton.icon(
                 onPressed: () => context.push(
                   AppRoutes.applyInterest(store.id),
-                  extra: ApplyInterestRequest(
-                    rate: store.monthlyInterestRate,
-                  ),
+                  extra: ApplyInterestRequest(rate: store.monthlyInterestRate),
                 ),
                 icon: const Icon(Icons.percent_rounded, size: 20),
                 label: Text(

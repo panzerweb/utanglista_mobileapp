@@ -56,6 +56,18 @@ class _DashboardView extends StatefulWidget {
 }
 
 class _DashboardViewState extends State<_DashboardView> {
+  // Scroll Controllers
+  final ScrollController _owesTheMostScrollController = ScrollController();
+  final ScrollController _recentActivityScrollController = ScrollController();
+  final ScrollController _storesController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+
+    _loadDashboard();
+  }
+
   /*
     Reloads whenever the user comes back from anywhere the dashboard
     links to — every one of those screens can change a figure on it.
@@ -66,6 +78,21 @@ class _DashboardViewState extends State<_DashboardView> {
     await context.push(route);
 
     if (mounted) await cubit.loadDashboard();
+  }
+
+  Future<void> _loadDashboard() async {
+    final cubit = context.read<DashboardCubit>();
+
+    if (mounted) await cubit.loadDashboard();
+  }
+
+  @override
+  void dispose() {
+    _owesTheMostScrollController.dispose();
+    _recentActivityScrollController.dispose();
+    _storesController.dispose();
+
+    super.dispose();
   }
 
   @override
@@ -97,8 +124,8 @@ class _DashboardViewState extends State<_DashboardView> {
               message:
                   'Create your first store to start tracking utang. '
                   'Your totals will appear here.',
-              actionLabel: 'Add a store',
-              onAction: () => _open(AppRoutes.newStore),
+              actionLabel: 'Try to Refresh',
+              onAction: () => _loadDashboard(),
             );
           }
 
@@ -107,67 +134,95 @@ class _DashboardViewState extends State<_DashboardView> {
           return RefreshIndicator(
             color: AppPalette.primary,
             onRefresh: cubit.loadDashboard,
-            child: ListView(
+            child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-              children: [
-                _ReceivableCard(summary: summary),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _ReceivableCard(summary: summary),
 
-                if (summary.storesNeedingInterest.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  _InterestNudge(
-                    stores: summary.storesNeedingInterest,
-                    onOpen: (store) => _open(
-                      AppRoutes.storeDetail(store.storeId),
+                  if (summary.storesNeedingInterest.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    _InterestNudge(
+                      stores: summary.storesNeedingInterest,
+                      onOpen: (store) =>
+                          _open(AppRoutes.storeDetail(store.storeId)),
                     ),
+                  ],
+
+                  if (summary.topDebtors.isNotEmpty) ...[
+                    const SizedBox(height: 24),
+                    const _SectionLabel('Owes the most'),
+                    ListView.builder(
+                      scrollDirection: Axis.vertical,
+                      controller: _owesTheMostScrollController,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: summary.topDebtors.length,
+                      itemBuilder: (context, index) {
+                        final debtor = summary.topDebtors[index];
+                        return _DebtorCard(
+                          debtor: debtor,
+                          onTap: () => _open(
+                            AppRoutes.customerDetail(
+                              debtor.storeId,
+                              debtor.customerId,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+
+                  if (summary.recentActivity.isNotEmpty) ...[
+                    const SizedBox(height: 24),
+                    const _SectionLabel('Recent activity'),
+                    ListView.builder(
+                      scrollDirection: Axis.vertical,
+                      controller: _recentActivityScrollController,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: summary.recentActivity.length,
+                      itemBuilder: (context, index) {
+                        final activity = summary.recentActivity[index];
+                        return _ActivityRow(
+                          activity: activity,
+                          onTap: () => _open(
+                            activity.kind == ActivityKind.utang
+                                ? AppRoutes.transactionDetail(
+                                    activity.storeId,
+                                    activity.sourceId,
+                                  )
+                                : AppRoutes.customerDetail(
+                                    activity.storeId,
+                                    activity.customerId,
+                                  ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+
+                  const SizedBox(height: 24),
+                  _SectionLabel('Your stores (${summary.stores.length})'),
+                  ListView.builder(
+                    scrollDirection: Axis.vertical,
+                    controller: _storesController,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: summary.stores.length,
+                    itemBuilder: (context, index) {
+                      final store = summary.stores[index];
+                      return _StoreRow(
+                        store: store,
+                        onTap: () =>
+                            _open(AppRoutes.storeDetail(store.storeId)),
+                      );
+                    },
                   ),
                 ],
-
-                if (summary.topDebtors.isNotEmpty) ...[
-                  const SizedBox(height: 24),
-                  const _SectionLabel('Owes the most'),
-                  for (final debtor in summary.topDebtors)
-                    _DebtorCard(
-                      debtor: debtor,
-                      onTap: () => _open(
-                        AppRoutes.customerDetail(
-                          debtor.storeId,
-                          debtor.customerId,
-                        ),
-                      ),
-                    ),
-                ],
-
-                if (summary.recentActivity.isNotEmpty) ...[
-                  const SizedBox(height: 24),
-                  const _SectionLabel('Recent activity'),
-                  for (final activity in summary.recentActivity)
-                    _ActivityRow(
-                      activity: activity,
-                      onTap: () => _open(
-                        activity.kind == ActivityKind.utang
-                            ? AppRoutes.transactionDetail(
-                                activity.storeId,
-                                activity.sourceId,
-                              )
-                            : AppRoutes.customerDetail(
-                                activity.storeId,
-                                activity.customerId,
-                              ),
-                      ),
-                    ),
-                ],
-
-                const SizedBox(height: 24),
-                _SectionLabel('Your stores (${summary.stores.length})'),
-                for (final store in summary.stores)
-                  _StoreRow(
-                    store: store,
-                    onTap: () => _open(
-                      AppRoutes.storeDetail(store.storeId),
-                    ),
-                  ),
-              ],
+              ),
             ),
           );
         },
@@ -240,18 +295,12 @@ class _ReceivableCard extends StatelessWidget {
           // The §15 breakdown, so the headline is checkable.
           Row(
             children: [
-              _Stat(
-                label: 'Utang',
-                value: summary.overall.totalUtang.format(),
-              ),
+              _Stat(label: 'Utang', value: summary.overall.totalUtang.format()),
               _Stat(
                 label: 'Interest',
                 value: summary.overall.totalInterest.format(),
               ),
-              _Stat(
-                label: 'Paid',
-                value: summary.overall.totalPaid.format(),
-              ),
+              _Stat(label: 'Paid', value: summary.overall.totalPaid.format()),
             ],
           ),
 
