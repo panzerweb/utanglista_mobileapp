@@ -147,6 +147,42 @@ class _TransactionBuilderViewState extends State<_TransactionBuilderView> {
     );
   }
 
+  /*
+    ------------------------------------------------------------------
+    The last stop before a permanent record.
+    ------------------------------------------------------------------
+
+    §31 makes a committed transaction read-only and §30 keeps it, so a
+    cart submitted against the wrong customer cannot be corrected —
+    only offset by a second record that makes the ledger harder to
+    read, not easier.
+
+    The cart itself is already on screen, so the dialog does not
+    re-list it. It names the two things a mis-tap actually gets wrong:
+    WHO is taking this on credit, and HOW MUCH.
+  */
+  Future<void> _confirmSubmit() async {
+    final cubit = context.read<TransactionBuilderCubit>();
+    final draft = cubit.state.draft;
+
+    final customerName = draft.customer?.name ?? 'this customer';
+
+    final confirmed = await AppConfirmDialog.show(
+      context,
+      title: 'Record ${draft.total.format()}?',
+      message:
+          '$customerName takes '
+          '${draft.itemCount == 1 ? '1 item' : '${draft.itemCount} items'} '
+          'on credit. An utang cannot be edited or deleted once '
+          'recorded.',
+      confirmLabel: 'Record utang',
+    );
+
+    if (!confirmed) return;
+
+    await cubit.submit();
+  }
+
   void _onBuilderState(BuildContext context, TransactionBuilderState state) {
     switch (state.status) {
       case TransactionBuilderStatus.submitted:
@@ -225,7 +261,7 @@ class _TransactionBuilderViewState extends State<_TransactionBuilderView> {
                   ),
                 ),
 
-                _SubmitBar(state: state, onSubmit: cubit.submit),
+                _SubmitBar(state: state, onSubmit: _confirmSubmit),
               ],
             ),
           ),

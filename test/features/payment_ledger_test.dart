@@ -1,6 +1,7 @@
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:utanglista_mobileapp/core/config/app_database.dart';
+import 'package:utanglista_mobileapp/core/constants/sort_options.dart';
 import 'package:utanglista_mobileapp/core/error/error_definition.dart';
 import 'package:utanglista_mobileapp/core/money/money.dart';
 import 'package:utanglista_mobileapp/core/utils/app_date_format.dart';
@@ -218,6 +219,99 @@ void main() {
   /*
     §23 — the rule, and the race it would otherwise have.
   */
+  group('payment history search and sort', () {
+    test('search matches the payer name', () async {
+      final maria = await customers.createCustomer(
+        CustomerPayloadModel(storeId: storeId, name: 'Maria Santos'),
+      );
+
+      await addUtang(Money.fromPesos(500));
+      await addUtang(Money.fromPesos(500), customerId: maria);
+
+      await pay(Money.fromPesos(100));
+      await pay(Money.fromPesos(200), customerId: maria);
+
+      final found = await payments.fetchPayments(storeId, search: 'maria');
+
+      expect(found, hasLength(1));
+      expect(found.single.amount, Money.fromPesos(200));
+    });
+
+    test('search matches the note', () async {
+      await addUtang(Money.fromPesos(500));
+
+      await pay(Money.fromPesos(100), note: 'bayad sa fiesta');
+      await pay(Money.fromPesos(50));
+
+      expect(
+        await payments.fetchPayments(storeId, search: 'FIESTA'),
+        hasLength(1),
+      );
+    });
+
+    test('a payment with no note is not matched by a search', () async {
+      // A null note must not act like an empty string, which every
+      // LIKE pattern would match.
+      await addUtang(Money.fromPesos(500));
+      await pay(Money.fromPesos(100));
+
+      expect(await payments.fetchPayments(storeId, search: 'bayad'), isEmpty);
+    });
+
+    /*
+      Three payments inside one unix second, so each direction rests on
+      its id tiebreaker — and it has to follow the sort, or same-second
+      rows come back reversed.
+    */
+    test('oldest-first is the exact reverse of newest-first', () async {
+      await addUtang(Money.fromPesos(500));
+
+      final first = await pay(Money.fromPesos(50));
+      final second = await pay(Money.fromPesos(60));
+      final third = await pay(Money.fromPesos(70));
+
+      final newest = await payments.fetchPayments(storeId);
+      final oldest = await payments.fetchPayments(
+        storeId,
+        sort: PaymentSort.oldest,
+      );
+
+      expect(newest.map((p) => p.id), [third, second, first]);
+      expect(oldest.map((p) => p.id), [first, second, third]);
+    });
+
+    test('by largest amount', () async {
+      await addUtang(Money.fromPesos(500));
+
+      await pay(Money.fromPesos(50));
+      await pay(Money.fromPesos(300));
+      await pay(Money.fromPesos(120));
+
+      final byAmount = await payments.fetchPayments(
+        storeId,
+        sort: PaymentSort.amountHighLow,
+      );
+
+      expect(byAmount.map((p) => p.amount), [
+        Money.fromPesos(300),
+        Money.fromPesos(120),
+        Money.fromPesos(50),
+      ]);
+    });
+
+    test('sorting never changes what the balance is', () async {
+      // §15 comes from CustomerBalance, not from the order a history
+      // screen happens to be showing.
+      await addUtang(Money.fromPesos(500));
+      await pay(Money.fromPesos(100));
+      await pay(Money.fromPesos(50));
+
+      await payments.fetchPayments(storeId, sort: PaymentSort.amountHighLow);
+
+      expect(await outstanding(), Money.fromPesos(350));
+    });
+  });
+
   group('overpayment guard (§23)', () {
     test('rejects more than is owed, and names the real figure', () async {
       await addUtang(Money.fromPesos(500));

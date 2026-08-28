@@ -1,3 +1,4 @@
+import 'package:utanglista_mobileapp/core/constants/sort_options.dart';
 import 'package:utanglista_mobileapp/core/helper/repository_guard.dart';
 import 'package:utanglista_mobileapp/features/stores/data/datasource/store_local_data_source.dart';
 import 'package:utanglista_mobileapp/features/stores/data/model/store_payload_model.dart';
@@ -6,7 +7,11 @@ import 'package:utanglista_mobileapp/features/stores/domain/entities/store_entit
 abstract class StoreRepository {
   Future<int> createStore(StorePayloadModel payload);
   Future<StoreEntity?> fetchStoreById(int storeId);
-  Future<List<StoreEntity>> fetchStores(String? category);
+  Future<List<StoreEntity>> fetchStores(
+    String? category, {
+    String? search,
+    StoreSort sort,
+  });
   Future<int> updateStore(UpdateStorePayloadModel updatePayload);
   Future<int> deleteStore(int storeId);
 }
@@ -37,9 +42,17 @@ class StoreRepositoryImplementation implements StoreRepository {
   }
 
   @override
-  Future<List<StoreEntity>> fetchStores(String? category) {
+  Future<List<StoreEntity>> fetchStores(
+    String? category, {
+    String? search,
+    StoreSort sort = StoreSort.recent,
+  }) {
     return repositoryGuard(() async {
-      final storesModel = await localDataSource.fetchStores(category);
+      final storesModel = await localDataSource.fetchStores(
+        category,
+        search: search,
+        sort: sort,
+      );
       final stores = storesModel.map((model) => model.toEntity()).toList();
 
       return stores;

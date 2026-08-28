@@ -1,3 +1,4 @@
+import 'package:utanglista_mobileapp/core/constants/sort_options.dart';
 import 'package:utanglista_mobileapp/core/error/error_definition.dart';
 import 'package:utanglista_mobileapp/core/helper/repository_guard.dart';
 import 'package:utanglista_mobileapp/features/customers/data/datasource/customer_local_data_source.dart';
@@ -11,6 +12,7 @@ abstract class CustomerRepository {
     int storeId, {
     String? search,
     bool includeInactive,
+    CustomerSort sort,
   });
   Future<int> updateCustomer(UpdateCustomerPayloadModel updatePayload);
   Future<int> setActive(int customerId, {required bool isActive});
@@ -47,12 +49,14 @@ class CustomerRepositoryImplementation implements CustomerRepository {
     int storeId, {
     String? search,
     bool includeInactive = true,
+    CustomerSort sort = CustomerSort.recent,
   }) {
     return repositoryGuard(() async {
       final models = await localDataSource.fetchCustomers(
         storeId,
         search: search,
         includeInactive: includeInactive,
+        sort: sort,
       );
 
       return models.map((model) => model.toEntity()).toList();

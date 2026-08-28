@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:utanglista_mobileapp/core/constants/sort_options.dart';
 import 'package:utanglista_mobileapp/core/routes/routes.dart';
 import 'package:utanglista_mobileapp/core/services/service_locator.dart';
+import 'package:utanglista_mobileapp/core/shared/sort_menu_button.dart';
+import 'package:utanglista_mobileapp/core/shared/textfield/app_search_field.dart';
 import 'package:utanglista_mobileapp/core/shared/views/app_error_view.dart';
 import 'package:utanglista_mobileapp/core/shared/views/app_loading_view.dart';
 import 'package:utanglista_mobileapp/core/shared/views/empty_state_view.dart';
@@ -154,94 +157,38 @@ class _CustomersView extends StatelessWidget {
 // ============================================================
 // SEARCH + FILTER
 // ============================================================
-class _SearchAndFilterBar extends StatefulWidget {
+class _SearchAndFilterBar extends StatelessWidget {
   final CustomerListState state;
   final CustomerListCubit cubit;
 
   const _SearchAndFilterBar({required this.state, required this.cubit});
 
   @override
-  State<_SearchAndFilterBar> createState() => _SearchAndFilterBarState();
-}
-
-class _SearchAndFilterBarState extends State<_SearchAndFilterBar> {
-  late final TextEditingController _controller = TextEditingController(
-    text: widget.state.search,
-  );
-
-  @override
-  void didUpdateWidget(_SearchAndFilterBar oldWidget) {
-    super.didUpdateWidget(oldWidget);
-
-    // The cubit can clear the search itself (from the empty state's
-    // "Clear search" action); keep the field in step without fighting
-    // the user's cursor while they type.
-    if (widget.state.search.isEmpty && _controller.text.isNotEmpty) {
-      _controller.clear();
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final state = widget.state;
-
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       color: AppPalette.background,
       child: Row(
         children: [
           Expanded(
-            child: TextField(
-              controller: _controller,
-              onChanged: widget.cubit.search,
-              textInputAction: TextInputAction.search,
-              style: AppTextStyles.body1.copyWith(
-                color: AppPalette.textPrimary,
-              ),
-              decoration: InputDecoration(
-                isDense: true,
-                hintText: 'Search name or number',
-                hintStyle: AppTextStyles.body1.copyWith(
-                  color: AppPalette.textMuted,
-                ),
-                prefixIcon: const Icon(
-                  Icons.search_rounded,
-                  color: AppPalette.textMuted,
-                  size: 20,
-                ),
-                suffixIcon: state.search.isEmpty
-                    ? null
-                    : IconButton(
-                        tooltip: 'Clear search',
-                        icon: const Icon(Icons.close_rounded, size: 18),
-                        color: AppPalette.textMuted,
-                        onPressed: () {
-                          _controller.clear();
-                          widget.cubit.clearSearch();
-                        },
-                      ),
-                filled: true,
-                fillColor: AppPalette.surface,
-                contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppPalette.border),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(
-                    color: AppPalette.primary,
-                    width: 1.5,
-                  ),
-                ),
-              ),
+            child: AppSearchField(
+              value: state.search,
+              hintText: 'Name or number',
+              onChanged: cubit.search,
+              onClear: cubit.clearSearch,
             ),
+          ),
+
+          const SizedBox(width: 8),
+
+          // Compact: this bar already carries the inactive toggle, and
+          // the search field is what needs the width.
+          SortMenuButton<CustomerSort>(
+            compact: true,
+            selected: state.sort,
+            items: CustomerSort.values,
+            itemLabel: (sort) => sort.label,
+            onSelected: cubit.setSort,
           ),
 
           const SizedBox(width: 8),
@@ -263,7 +210,7 @@ class _SearchAndFilterBarState extends State<_SearchAndFilterBar> {
               child: InkWell(
                 borderRadius: BorderRadius.circular(12),
                 onTap: () =>
-                    widget.cubit.setIncludeInactive(!state.includeInactive),
+                    cubit.setIncludeInactive(!state.includeInactive),
                 child: Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(

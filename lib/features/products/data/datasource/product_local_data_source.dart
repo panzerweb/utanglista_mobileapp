@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:utanglista_mobileapp/core/config/app_database.dart';
+import 'package:utanglista_mobileapp/core/constants/sort_options.dart';
 import 'package:utanglista_mobileapp/features/products/data/model/product_model.dart';
 import 'package:utanglista_mobileapp/features/products/data/model/product_payload_model.dart';
 
@@ -11,6 +12,7 @@ abstract class ProductLocalDataSource {
     int storeId, {
     String? search,
     bool includeInactive,
+    ProductSort sort,
   });
   Future<int> updateProduct(UpdateProductPayloadModel updatePayload);
   Future<int> deleteProduct(int productId);
@@ -109,6 +111,7 @@ class ProductLocalDataSourceImplementation implements ProductLocalDataSource {
     int storeId, {
     String? search,
     bool includeInactive = true,
+    ProductSort sort = ProductSort.name,
   }) async {
     try {
       final query = database.select(productsTable)
@@ -132,16 +135,33 @@ class ProductLocalDataSourceImplementation implements ProductLocalDataSource {
       }
 
       /*
-        Active first, then alphabetical. A catalogue is browsed by name,
-        unlike the customer list which is browsed by recency.
+        Active first whatever the sort (§28), then the chosen key. A
+        catalogue is browsed by name by default, unlike the customer
+        list which is browsed by recency.
 
-        The id tiebreaker keeps two identically-named products in a
-        stable order between loads.
+        The id tiebreaker keeps two identically-named or identically-
+        priced products in a stable order between loads.
       */
       query.orderBy([
         (tbl) => OrderingTerm.desc(tbl.isActive),
-        (tbl) => OrderingTerm.asc(tbl.name),
-        (tbl) => OrderingTerm.asc(tbl.id),
+        ...switch (sort) {
+          ProductSort.name => [
+            (productsTable) => OrderingTerm.asc(productsTable.name),
+            (productsTable) => OrderingTerm.asc(productsTable.id),
+          ],
+          ProductSort.priceHighLow => [
+            (productsTable) => OrderingTerm.desc(productsTable.price),
+            (productsTable) => OrderingTerm.asc(productsTable.id),
+          ],
+          ProductSort.priceLowHigh => [
+            (productsTable) => OrderingTerm.asc(productsTable.price),
+            (productsTable) => OrderingTerm.asc(productsTable.id),
+          ],
+          ProductSort.recent => [
+            (productsTable) => OrderingTerm.desc(productsTable.createdAt),
+            (productsTable) => OrderingTerm.desc(productsTable.id),
+          ],
+        },
       ]);
 
       final rows = await query.get();

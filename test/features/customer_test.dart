@@ -1,12 +1,16 @@
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:utanglista_mobileapp/core/config/app_database.dart';
+import 'package:utanglista_mobileapp/core/constants/sort_options.dart';
 import 'package:utanglista_mobileapp/core/error/error_definition.dart';
 import 'package:utanglista_mobileapp/core/money/money.dart';
+import 'package:utanglista_mobileapp/features/customers/data/datasource/customer_balance_local_data_source.dart';
 import 'package:utanglista_mobileapp/features/customers/data/datasource/customer_local_data_source.dart';
 import 'package:utanglista_mobileapp/features/customers/data/model/customer_payload_model.dart';
 import 'package:utanglista_mobileapp/features/customers/domain/entities/customer_entity.dart';
+import 'package:utanglista_mobileapp/features/customers/domain/repositories/customer_balance_repository.dart';
 import 'package:utanglista_mobileapp/features/customers/domain/repositories/customer_repository.dart';
+import 'package:utanglista_mobileapp/features/customers/presentation/bloc/customer_cubit.dart';
 import 'package:utanglista_mobileapp/features/stores/data/datasource/store_local_data_source.dart';
 import 'package:utanglista_mobileapp/features/stores/data/model/store_payload_model.dart';
 import 'package:utanglista_mobileapp/features/stores/domain/repositories/store_repository.dart';
@@ -402,6 +406,136 @@ void main() {
       expect(await repository.hasFinancialHistory(withPayment), isTrue);
       expect(await repository.hasFinancialHistory(withInterest), isTrue);
       expect(await repository.hasFinancialHistory(withNothing), isFalse);
+    });
+
+    /*
+      Two of the three customer sorts are an ORDER BY in the
+      datasource. The third — by balance — cannot be, and is tested
+      separately below through the cubit, because the balance lives in
+      a different query.
+    */
+    group('sorting', () {
+      Future<List<String>> namesSortedBy(
+        CustomerSort sort, {
+        bool includeInactive = false,
+      }) async {
+        final customers = await repository.fetchCustomers(
+          storeId,
+          sort: sort,
+          includeInactive: includeInactive,
+        );
+
+        return customers.map((c) => c.name).toList();
+      }
+
+      /*
+        Newest-first with everything created in the same unix second,
+        so this is really a test of the id tiebreaker. Without it the
+        customer list reshuffles between loads — the Phase 1 bug, in
+        the feature that came after it.
+      */
+      test('defaults to newest first', () async {
+        await addCustomer('Juan');
+        await addCustomer('Maria');
+        await addCustomer('Pedro');
+
+        final customers = await repository.fetchCustomers(storeId);
+
+        expect(customers.map((c) => c.name), ['Pedro', 'Maria', 'Juan']);
+      });
+
+      test('by name, A–Z', () async {
+        await addCustomer('Pedro');
+        await addCustomer('Juan');
+        await addCustomer('Maria');
+
+        expect(await namesSortedBy(CustomerSort.name), [
+          'Juan',
+          'Maria',
+          'Pedro',
+        ]);
+      });
+
+      /// §29: a deactivated customer is still listed when asked for,
+      /// but never above someone the seller is actively dealing with.
+      test('deactivated customers sort last, whatever the sort', () async {
+        final juan = await addCustomer('Juan');
+        await addCustomer('Maria');
+        await addCustomer('Pedro');
+
+        await repository.setActive(juan, isActive: false);
+
+        expect(
+          await namesSortedBy(CustomerSort.name, includeInactive: true),
+          ['Maria', 'Pedro', 'Juan'],
+        );
+      });
+
+      /*
+        CustomerSort.balance has no column to sort on, so the datasource
+        gives it a deterministic base order and the CUBIT re-sorts once
+        the batched balances arrive. That seam is the thing worth
+        testing: the screen must receive a list already in its final
+        order.
+      */
+      group('by balance (ordered in the cubit, not in SQL)', () {
+        late CustomerBalanceRepository balanceRepository;
+
+        setUp(() {
+          balanceRepository = CustomerBalanceRepositoryImplementation(
+            CustomerBalanceLocalDataSourceImplementation(db),
+          );
+        });
+
+        Future<List<String>> loadSortedByBalance() async {
+          final cubit = CustomerListCubit(
+            repository,
+            balanceRepository,
+            storeId: storeId,
+          );
+
+          await cubit.setSort(CustomerSort.balance);
+          final names = cubit.state.customers.map((c) => c.name).toList();
+
+          await cubit.close();
+          return names;
+        }
+
+        test('biggest debtor first', () async {
+          final juan = await addCustomer('Juan');
+          final maria = await addCustomer('Maria');
+          final pedro = await addCustomer('Pedro');
+
+          await addTransaction(juan, Money.fromPesos(500));
+          await addTransaction(maria, Money.fromPesos(1200));
+          await addTransaction(pedro, Money.fromPesos(80));
+
+          expect(await loadSortedByBalance(), ['Maria', 'Juan', 'Pedro']);
+        });
+
+        test('a customer who owes nothing sorts last', () async {
+          final juan = await addCustomer('Juan');
+          await addCustomer('Maria');
+
+          await addTransaction(juan, Money.fromPesos(500));
+
+          // Maria has no financial records at all, so she has no row
+          // in the batched balance map — she must read as ₱0.00, not
+          // as an absent value that throws or sorts first.
+          expect(await loadSortedByBalance(), ['Juan', 'Maria']);
+        });
+
+        test('two customers owing the same keep a stable order', () async {
+          final juan = await addCustomer('Juan');
+          final maria = await addCustomer('Maria');
+
+          await addTransaction(juan, Money.fromPesos(300));
+          await addTransaction(maria, Money.fromPesos(300));
+
+          expect(await loadSortedByBalance(), ['Juan', 'Maria']);
+          expect(await loadSortedByBalance(), ['Juan', 'Maria']);
+        });
+      });
     });
 
     test('deleting a store removes its customers', () async {

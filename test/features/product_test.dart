@@ -1,6 +1,7 @@
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:utanglista_mobileapp/core/config/app_database.dart';
+import 'package:utanglista_mobileapp/core/constants/sort_options.dart';
 import 'package:utanglista_mobileapp/core/error/error_definition.dart';
 import 'package:utanglista_mobileapp/core/money/money.dart';
 import 'package:utanglista_mobileapp/features/products/data/datasource/product_local_data_source.dart';
@@ -442,6 +443,133 @@ void main() {
             isA<AppFailure>().having((f) => f.code, 'code', 'NOT_FOUND'),
           ),
         );
+      });
+    });
+
+    /*
+      Sorting is a QUERY concern — every option below is an ORDER BY in
+      the datasource, never a .sort() in a widget. These tests exist
+      because two of them are easy to get wrong: the active-first rule
+      has to survive whatever the user picked, and every option needs
+      an id tiebreaker or rows reshuffle between identical values.
+    */
+    group('sorting', () {
+      Future<List<String>> namesSortedBy(
+        ProductSort sort, {
+        bool includeInactive = false,
+      }) async {
+        final products = await repository.fetchProducts(
+          storeId,
+          sort: sort,
+          includeInactive: includeInactive,
+        );
+
+        return products.map((p) => p.name).toList();
+      }
+
+      test('defaults to name A–Z', () async {
+        await addProduct('Sardines');
+        await addProduct('Bigas');
+        await addProduct('Mantika');
+
+        // The default on the repository signature, not just the enum.
+        final products = await repository.fetchProducts(storeId);
+
+        expect(products.map((p) => p.name), ['Bigas', 'Mantika', 'Sardines']);
+      });
+
+      test('by price, both directions', () async {
+        await addProduct('Bigas', price: Money.fromPesos(52.50));
+        await addProduct('Sardines', price: Money.fromPesos(28));
+        await addProduct('Mantika', price: Money.fromPesos(85));
+
+        expect(await namesSortedBy(ProductSort.priceHighLow), [
+          'Mantika',
+          'Bigas',
+          'Sardines',
+        ]);
+        expect(await namesSortedBy(ProductSort.priceLowHigh), [
+          'Sardines',
+          'Bigas',
+          'Mantika',
+        ]);
+      });
+
+      /*
+        Drift stores createdAt as unix SECONDS, so three products added
+        in one test share a timestamp. Newest-first therefore rests
+        entirely on the id tiebreaker — which is the point: without it
+        this order would be undefined.
+      */
+      test('by recency, with the id breaking a same-second tie', () async {
+        await addProduct('Bigas');
+        await addProduct('Sardines');
+        await addProduct('Mantika');
+
+        expect(await namesSortedBy(ProductSort.recent), [
+          'Mantika',
+          'Sardines',
+          'Bigas',
+        ]);
+      });
+
+      test('two products at the same price keep a stable order', () async {
+        await addProduct('Bigas', price: Money.fromPesos(50));
+        await addProduct('Sardines', price: Money.fromPesos(50));
+
+        // Same price, so only the id separates them — and it must give
+        // the same answer every time the list loads.
+        expect(await namesSortedBy(ProductSort.priceHighLow), [
+          'Bigas',
+          'Sardines',
+        ]);
+        expect(await namesSortedBy(ProductSort.priceHighLow), [
+          'Bigas',
+          'Sardines',
+        ]);
+      });
+
+      /*
+        §28: a deactivated product belongs at the bottom of the list
+        whatever the sort — otherwise the cheapest item in the store
+        turns out to be one that can no longer be sold.
+      */
+      test('deactivated products sort last, whatever the sort', () async {
+        final cheap = await addProduct('Bigas', price: Money.fromPesos(10));
+        await addProduct('Sardines', price: Money.fromPesos(28));
+        await addProduct('Mantika', price: Money.fromPesos(85));
+
+        await repository.setActive(cheap, isActive: false);
+
+        expect(
+          await namesSortedBy(
+            ProductSort.priceLowHigh,
+            includeInactive: true,
+          ),
+          ['Sardines', 'Mantika', 'Bigas'],
+        );
+
+        expect(
+          await namesSortedBy(ProductSort.name, includeInactive: true),
+          ['Mantika', 'Sardines', 'Bigas'],
+        );
+      });
+
+      test('sorting still respects the search filter', () async {
+        await addProduct('Bigas Sinandomeng', price: Money.fromPesos(52));
+        await addProduct('Bigas Dinorado', price: Money.fromPesos(60));
+        await addProduct('Sardines', price: Money.fromPesos(28));
+
+        final products = await repository.fetchProducts(
+          storeId,
+          search: 'bigas',
+          sort: ProductSort.priceHighLow,
+        );
+
+        expect(products.map((p) => p.name), [
+          'Bigas Dinorado',
+          'Bigas Sinandomeng',
+        ]);
       });
     });
 

@@ -1,6 +1,7 @@
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:utanglista_mobileapp/core/config/app_database.dart';
+import 'package:utanglista_mobileapp/core/constants/sort_options.dart';
 import 'package:utanglista_mobileapp/core/error/error_definition.dart';
 import 'package:utanglista_mobileapp/core/money/money.dart';
 import 'package:utanglista_mobileapp/features/customers/data/datasource/customer_balance_local_data_source.dart';
@@ -520,6 +521,139 @@ void main() {
         hasLength(1),
       );
       expect(await transactions.fetchTransactions(storeId), hasLength(2));
+    });
+
+    group('search and sort', () {
+      test('search matches the customer name', () async {
+        final rice = await addProduct('Rice', Money.fromPesos(100));
+        final maria = await customers.createCustomer(
+          CustomerPayloadModel(storeId: storeId, name: 'Maria Santos'),
+        );
+
+        await transactions.createTransaction(
+          payload([line(rice, 1, Money.fromPesos(100))]),
+        );
+        await transactions.createTransaction(
+          payload([line(rice, 2, Money.fromPesos(100))], customerId: maria),
+        );
+
+        final found = await transactions.fetchTransactions(
+          storeId,
+          search: 'maria',
+        );
+
+        expect(found, hasLength(1));
+        expect(found.single.customerName, 'Maria Santos');
+      });
+
+      test('search matches the note', () async {
+        final rice = await addProduct('Rice', Money.fromPesos(100));
+
+        await transactions.createTransaction(
+          payload([line(rice, 1, Money.fromPesos(100))], note: 'for fiesta'),
+        );
+        await transactions.createTransaction(
+          payload([line(rice, 2, Money.fromPesos(100))]),
+        );
+
+        expect(
+          await transactions.fetchTransactions(storeId, search: 'FIESTA'),
+          hasLength(1),
+        );
+      });
+
+      test('a transaction with no note is not matched by a search', () async {
+        // A null note must not behave like an empty string that matches
+        // every LIKE pattern.
+        final rice = await addProduct('Rice', Money.fromPesos(100));
+        await transactions.createTransaction(
+          payload([line(rice, 1, Money.fromPesos(100))]),
+        );
+
+        expect(
+          await transactions.fetchTransactions(storeId, search: 'fiesta'),
+          isEmpty,
+        );
+      });
+
+      /*
+        All three are written inside one unix second, so each direction
+        rests on its id tiebreaker — and the tiebreaker has to FOLLOW
+        the sort. Ascending time with descending ids would hand back
+        same-second rows in reverse.
+      */
+      test('oldest-first is the exact reverse of newest-first', () async {
+        final rice = await addProduct('Rice', Money.fromPesos(100));
+
+        final first = await transactions.createTransaction(
+          payload([line(rice, 1, Money.fromPesos(100))]),
+        );
+        final second = await transactions.createTransaction(
+          payload([line(rice, 2, Money.fromPesos(100))]),
+        );
+        final third = await transactions.createTransaction(
+          payload([line(rice, 3, Money.fromPesos(100))]),
+        );
+
+        final oldest = await transactions.fetchTransactions(
+          storeId,
+          sort: TransactionSort.oldest,
+        );
+
+        expect(oldest.map((t) => t.id), [first, second, third]);
+      });
+
+      test('by largest amount', () async {
+        final rice = await addProduct('Rice', Money.fromPesos(100));
+
+        final small = await transactions.createTransaction(
+          payload([line(rice, 1, Money.fromPesos(100))]),
+        );
+        final big = await transactions.createTransaction(
+          payload([line(rice, 5, Money.fromPesos(100))]),
+        );
+        final middle = await transactions.createTransaction(
+          payload([line(rice, 3, Money.fromPesos(100))]),
+        );
+
+        final byAmount = await transactions.fetchTransactions(
+          storeId,
+          sort: TransactionSort.amountHighLow,
+        );
+
+        expect(byAmount.map((t) => t.id), [big, middle, small]);
+      });
+
+      test('search, customer filter and sort compose', () async {
+        final rice = await addProduct('Rice', Money.fromPesos(100));
+        final maria = await customers.createCustomer(
+          CustomerPayloadModel(storeId: storeId, name: 'Maria'),
+        );
+
+        await transactions.createTransaction(
+          payload([line(rice, 1, Money.fromPesos(100))], note: 'fiesta'),
+        );
+        await transactions.createTransaction(
+          payload(
+            [line(rice, 4, Money.fromPesos(100))],
+            customerId: maria,
+            note: 'fiesta',
+          ),
+        );
+        await transactions.createTransaction(
+          payload([line(rice, 9, Money.fromPesos(100))], customerId: maria),
+        );
+
+        final found = await transactions.fetchTransactions(
+          storeId,
+          customerId: maria,
+          search: 'fiesta',
+          sort: TransactionSort.amountHighLow,
+        );
+
+        expect(found, hasLength(1));
+        expect(found.single.totalAmount, Money.fromPesos(400));
+      });
     });
 
     test('list rows do not carry their items', () async {

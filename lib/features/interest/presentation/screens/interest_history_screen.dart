@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:utanglista_mobileapp/core/constants/sort_options.dart';
 import 'package:utanglista_mobileapp/core/money/money.dart';
 import 'package:utanglista_mobileapp/core/services/service_locator.dart';
+import 'package:utanglista_mobileapp/core/shared/sort_menu_button.dart';
+import 'package:utanglista_mobileapp/core/shared/textfield/app_search_field.dart';
 import 'package:utanglista_mobileapp/core/shared/views/app_error_view.dart';
 import 'package:utanglista_mobileapp/core/shared/views/app_loading_view.dart';
 import 'package:utanglista_mobileapp/core/shared/views/empty_state_view.dart';
@@ -33,10 +36,9 @@ class InterestHistoryScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => locator<InterestHistoryCubit>(
-        param1: storeId,
-        param2: customerId,
-      )..loadRecords(),
+      create: (_) =>
+          locator<InterestHistoryCubit>(param1: storeId, param2: customerId)
+            ..loadRecords(),
       child: _InterestHistoryView(showCustomerName: customerId == null),
     );
   }
@@ -66,85 +68,182 @@ class _InterestHistoryView extends StatelessWidget {
         builder: (context, state) {
           final cubit = context.read<InterestHistoryCubit>();
 
-          if (state.status == InterestHistoryStatus.loading &&
-              state.records.isEmpty) {
-            return const AppLoadingView(message: 'Loading interest...');
-          }
-
-          if (state.status == InterestHistoryStatus.failure &&
-              state.error != null) {
-            return AppErrorView(
-              failure: state.error!,
-              onRetry: cubit.loadRecords,
-            );
-          }
-
-          if (state.isEmpty) {
-            return const EmptyStateView(
-              icon: Icons.percent_rounded,
-              title: 'No interest charged yet',
-              message:
-                  'Monthly interest charges will be listed here, grouped '
-                  'by the month they cover.',
-            );
-          }
-
-          final periods = state.byPeriod;
-          final periodKeys = periods.keys.toList();
-
-          return RefreshIndicator(
-            color: AppPalette.primary,
-            onRefresh: cubit.loadRecords,
-            child: ListView.builder(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-              itemCount: periodKeys.length,
-              itemBuilder: (context, index) {
-                final periodKey = periodKeys[index];
-                final records = periods[periodKey]!;
-                final total = records
-                    .map((record) => record.interestAmount)
-                    .sum();
-
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(4, 8, 4, 10),
-                      child: Row(
-                        children: [
-                          Text(
-                            AppDateFormat.periodLabel(periodKey),
-                            style: AppTextStyles.caption1.copyWith(
-                              color: AppPalette.textSecondary,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const Spacer(),
-                          Text(
-                            total.format(),
-                            style: AppTextStyles.caption1.copyWith(
-                              color: AppPalette.warning,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    for (final record in records)
-                      _RecordCard(
-                        record: record,
-                        showCustomerName: showCustomerName,
-                      ),
-
-                    const SizedBox(height: 8),
-                  ],
-                );
-              },
-            ),
+          /*
+            The search bar is hidden on a single customer's history:
+            every row is that person, so the only thing to match on is
+            their own name. The sort still earns its place there.
+          */
+          return Column(
+            children: [
+              _SearchAndSortBar(
+                state: state,
+                cubit: cubit,
+                showSearch: showCustomerName,
+              ),
+              Expanded(child: _buildBody(context, state, cubit)),
+            ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildBody(
+    BuildContext context,
+    InterestHistoryState state,
+    InterestHistoryCubit cubit,
+  ) {
+    if (state.status == InterestHistoryStatus.loading &&
+        state.records.isEmpty &&
+        state.search.isEmpty) {
+      return const AppLoadingView(message: 'Loading interest...');
+    }
+
+    if (state.status == InterestHistoryStatus.failure && state.error != null) {
+      return AppErrorView(failure: state.error!, onRetry: cubit.loadRecords);
+    }
+
+    if (state.isFilteredEmpty) {
+      return EmptyStateView(
+        icon: Icons.search_off_rounded,
+        title: 'No charges found',
+        message: 'Nothing matches "${state.search}".',
+        actionLabel: 'Clear search',
+        onAction: cubit.clearSearch,
+      );
+    }
+
+    if (state.isEmpty) {
+      return const EmptyStateView(
+        icon: Icons.percent_rounded,
+        title: 'No interest charged yet',
+        message:
+            'Monthly interest charges will be listed here, grouped '
+            'by the month they cover.',
+      );
+    }
+
+    /*
+            Sorted by amount, the rows cross months freely, so month
+            headings would repeat and jump. The list renders flat.
+          */
+    if (!state.isGroupedByPeriod) {
+      return RefreshIndicator(
+        color: AppPalette.primary,
+        onRefresh: cubit.loadRecords,
+        child: ListView.builder(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+          itemCount: state.records.length,
+          itemBuilder: (context, index) => _RecordCard(
+            record: state.records[index],
+            showCustomerName: showCustomerName,
+            // Flat, so each row has to say which month it covers
+            // — the heading that used to say so is gone.
+            showPeriod: true,
+          ),
+        ),
+      );
+    }
+
+    final periods = state.byPeriod;
+    final periodKeys = periods.keys.toList();
+
+    return RefreshIndicator(
+      color: AppPalette.primary,
+      onRefresh: cubit.loadRecords,
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+        itemCount: periodKeys.length,
+        itemBuilder: (context, index) {
+          final periodKey = periodKeys[index];
+          final records = periods[periodKey]!;
+          final total = records.map((record) => record.interestAmount).sum();
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 8, 4, 10),
+                child: Row(
+                  children: [
+                    Text(
+                      AppDateFormat.periodLabel(periodKey),
+                      style: AppTextStyles.caption1.copyWith(
+                        color: AppPalette.textSecondary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      total.format(),
+                      style: AppTextStyles.caption1.copyWith(
+                        color: AppPalette.warning,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              for (final record in records)
+                _RecordCard(record: record, showCustomerName: showCustomerName),
+
+              const SizedBox(height: 8),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ============================================================
+// SEARCH + SORT
+// ============================================================
+class _SearchAndSortBar extends StatelessWidget {
+  final InterestHistoryState state;
+  final InterestHistoryCubit cubit;
+
+  /// False on one customer's history, where searching their own name
+  /// would match every row.
+  final bool showSearch;
+
+  const _SearchAndSortBar({
+    required this.state,
+    required this.cubit,
+    required this.showSearch,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      color: AppPalette.background,
+      child: Row(
+        children: [
+          if (showSearch) ...[
+            Expanded(
+              child: AppSearchField(
+                value: state.search,
+                hintText: 'Customer',
+                onChanged: cubit.search,
+                onClear: cubit.clearSearch,
+              ),
+            ),
+            const SizedBox(width: 8),
+          ] else
+            const Spacer(),
+
+          SortMenuButton<InterestSort>(
+            compact: showSearch,
+            selected: state.sort,
+            items: InterestSort.values,
+            itemLabel: (sort) => sort.label,
+            onSelected: cubit.setSort,
+          ),
+        ],
       ),
     );
   }
@@ -154,7 +253,15 @@ class _RecordCard extends StatelessWidget {
   final InterestRecordEntity record;
   final bool showCustomerName;
 
-  const _RecordCard({required this.record, required this.showCustomerName});
+  /// True when the list is flat, so no month heading sits above this
+  /// row to say which period the charge covers.
+  final bool showPeriod;
+
+  const _RecordCard({
+    required this.record,
+    required this.showCustomerName,
+    this.showPeriod = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -199,10 +306,15 @@ class _RecordCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 3),
-                // The arithmetic, spelled out: rate × base = charge.
+                // The arithmetic, spelled out: rate × base = charge,
+                // plus the month it covers when nothing else says so.
                 Text(
-                  '${record.rate.formatPercent()} of '
-                  '${record.baseAmount.format()}',
+                  showPeriod
+                      ? '${record.rate.formatPercent()} of '
+                            '${record.baseAmount.format()} · '
+                            '${AppDateFormat.periodLabel(record.periodKey)}'
+                      : '${record.rate.formatPercent()} of '
+                            '${record.baseAmount.format()}',
                   style: AppTextStyles.caption1.copyWith(
                     color: AppPalette.textMuted,
                   ),

@@ -1,3 +1,4 @@
+import 'package:utanglista_mobileapp/core/constants/sort_options.dart';
 import 'package:utanglista_mobileapp/core/error/error_definition.dart';
 import 'package:utanglista_mobileapp/core/money/money.dart';
 import 'package:utanglista_mobileapp/features/transactions/domain/entities/transaction_draft.dart';
@@ -20,6 +21,15 @@ class TransactionListState {
 
   final List<TransactionEntity> transactions;
   final TransactionListStateStatus status;
+
+  /// Free-text search over the customer's name and the note. An empty
+  /// string means no search.
+  final String search;
+
+  /// How the history is ordered. Also decides whether it is grouped by
+  /// day at all -- see [isGroupedByDay].
+  final TransactionSort sort;
+
   final AppFailure? error;
 
   const TransactionListState({
@@ -27,11 +37,25 @@ class TransactionListState {
     this.customerId,
     this.transactions = const [],
     this.status = TransactionListStateStatus.initial,
+    this.search = '',
+    this.sort = TransactionSort.recent,
     this.error,
   });
 
   bool get isEmpty =>
       status == TransactionListStateStatus.success && transactions.isEmpty;
+
+  /// Empty because of the search rather than because nothing was ever
+  /// recorded — the empty state should offer to clear it.
+  bool get isFilteredEmpty => isEmpty && search.isNotEmpty;
+
+  /*
+    Day headings belong to a CHRONOLOGICAL list. Sorted by amount, the
+    rows no longer run in date order, so grouping them under dates
+    would produce headings that jump backwards and forwards. The list
+    renders flat instead.
+  */
+  bool get isGroupedByDay => sort != TransactionSort.amountHighLow;
 
   /// Everything ever put on credit in this scope. NOT the outstanding
   /// balance — payments are not subtracted here (§15, §18). The
@@ -59,7 +83,16 @@ class TransactionListState {
       groups.putIfAbsent(day, () => []).add(transaction);
     }
 
-    final days = groups.keys.toList()..sort((a, b) => b.compareTo(a));
+    /*
+      The day headings follow the sort. Newest-first is the default, but
+      an oldest-first list under newest-first headings would read as a
+      bug — the first heading would be the last day.
+    */
+    final days = groups.keys.toList()
+      ..sort(
+        (a, b) =>
+            sort == TransactionSort.oldest ? a.compareTo(b) : b.compareTo(a),
+      );
 
     return days
         .map((day) => TransactionDayGroup(day: day, transactions: groups[day]!))
@@ -69,6 +102,8 @@ class TransactionListState {
   TransactionListState copyWith({
     List<TransactionEntity>? transactions,
     TransactionListStateStatus? status,
+    String? search,
+    TransactionSort? sort,
     Object? error = _unset,
   }) {
     return TransactionListState(
@@ -76,6 +111,8 @@ class TransactionListState {
       customerId: customerId,
       transactions: transactions ?? this.transactions,
       status: status ?? this.status,
+      search: search ?? this.search,
+      sort: sort ?? this.sort,
       error: identical(error, _unset) ? this.error : error as AppFailure?,
     );
   }

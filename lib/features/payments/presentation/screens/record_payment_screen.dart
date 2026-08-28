@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:utanglista_mobileapp/core/money/money.dart';
 import 'package:utanglista_mobileapp/core/services/service_locator.dart';
+import 'package:utanglista_mobileapp/core/shared/app_confirm_dialog.dart';
 import 'package:utanglista_mobileapp/core/shared/app_snack_bar.dart';
 import 'package:utanglista_mobileapp/core/shared/textfield/money_text_field.dart';
 import 'package:utanglista_mobileapp/core/shared/views/app_error_view.dart';
@@ -80,16 +81,42 @@ class _RecordPaymentViewState extends State<_RecordPaymentView> {
     setState(() => _amountController.text = outstanding.toEditableString());
   }
 
-  void _submit() {
+  /*
+    ------------------------------------------------------------------
+    Why a payment is confirmed and a product edit is not.
+    ------------------------------------------------------------------
+
+    §30 keeps financial records and V1 has no reversal, so a payment
+    recorded for the wrong amount — or against the wrong customer —
+    cannot be corrected. There is no edit, no delete, no undo. It is
+    the same reason the interest run confirms before it charges.
+
+    The dialog names the figure and the payer, because those are the
+    two things a mis-tap gets wrong, and reading them back is what
+    turns a confirmation into a check rather than a reflex.
+  */
+  Future<void> _submit(RecordPaymentState state) async {
     if (!_formKey.currentState!.validate()) return;
 
     final amount = MoneyTextField.read(_amountController);
     if (amount == null) return;
 
-    context.read<RecordPaymentCubit>().submit(
-      amount,
-      note: _noteController.text,
+    final cubit = context.read<RecordPaymentCubit>();
+
+    final remaining = state.balance.outstanding - amount;
+
+    final confirmed = await AppConfirmDialog.show(
+      context,
+      title: 'Record ${amount.format()}?',
+      message:
+          '${state.customerName} will owe ${remaining.format()} after '
+          'this. Payments cannot be edited or deleted once recorded.',
+      confirmLabel: 'Record payment',
     );
+
+    if (!confirmed) return;
+
+    cubit.submit(amount, note: _noteController.text);
   }
 
   void _onState(BuildContext context, RecordPaymentState state) {
@@ -248,7 +275,7 @@ class _RecordPaymentViewState extends State<_RecordPaymentView> {
             SizedBox(
               height: 52,
               child: FilledButton.icon(
-                onPressed: state.isSubmitting ? null : _submit,
+                onPressed: state.isSubmitting ? null : () => _submit(state),
                 icon: state.isSubmitting
                     ? const SizedBox(
                         width: 18,

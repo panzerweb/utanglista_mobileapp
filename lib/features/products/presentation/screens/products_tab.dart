@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:utanglista_mobileapp/core/constants/sort_options.dart';
 import 'package:utanglista_mobileapp/core/routes/routes.dart';
 import 'package:utanglista_mobileapp/core/services/service_locator.dart';
 import 'package:utanglista_mobileapp/core/shared/app_confirm_dialog.dart';
 import 'package:utanglista_mobileapp/core/shared/app_snack_bar.dart';
 import 'package:utanglista_mobileapp/core/shared/scanner/barcode_scanner_screen.dart';
+import 'package:utanglista_mobileapp/core/shared/sort_menu_button.dart';
+import 'package:utanglista_mobileapp/core/shared/textfield/app_search_field.dart';
 import 'package:utanglista_mobileapp/core/shared/views/app_error_view.dart';
 import 'package:utanglista_mobileapp/core/shared/views/app_loading_view.dart';
 import 'package:utanglista_mobileapp/core/shared/views/empty_state_view.dart';
 import 'package:utanglista_mobileapp/core/styles/app_palette.dart';
-import 'package:utanglista_mobileapp/core/styles/app_text_styles.dart';
 import 'package:utanglista_mobileapp/features/products/presentation/bloc/product_cubit.dart';
 import 'package:utanglista_mobileapp/features/products/presentation/bloc/product_state.dart';
 import 'package:utanglista_mobileapp/features/products/presentation/widgets/product_card.dart';
@@ -261,7 +263,7 @@ class _ProductsViewState extends State<_ProductsView> {
 // ============================================================
 // SEARCH BAR
 // ============================================================
-class _SearchBar extends StatefulWidget {
+class _SearchBar extends StatelessWidget {
   final ProductListState state;
   final ProductListCubit cubit;
   final VoidCallback onScan;
@@ -273,34 +275,7 @@ class _SearchBar extends StatefulWidget {
   });
 
   @override
-  State<_SearchBar> createState() => _SearchBarState();
-}
-
-class _SearchBarState extends State<_SearchBar> {
-  late final TextEditingController _controller = TextEditingController(
-    text: widget.state.search,
-  );
-
-  @override
-  void didUpdateWidget(_SearchBar oldWidget) {
-    super.didUpdateWidget(oldWidget);
-
-    // The cubit can clear the search itself (from the empty state's
-    // action); keep the field in step without fighting the cursor.
-    if (widget.state.search.isEmpty && _controller.text.isNotEmpty) {
-      _controller.clear();
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final state = widget.state;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
@@ -308,50 +283,13 @@ class _SearchBarState extends State<_SearchBar> {
       child: Row(
         children: [
           Expanded(
-            child: TextField(
-              controller: _controller,
-              onChanged: widget.cubit.search,
-              textInputAction: TextInputAction.search,
-              style: AppTextStyles.body1.copyWith(
-                color: AppPalette.textPrimary,
-              ),
-              decoration: InputDecoration(
-                isDense: true,
-                hintText: 'Search name or barcode',
-                hintStyle: AppTextStyles.body1.copyWith(
-                  color: AppPalette.textMuted,
-                ),
-                prefixIcon: const Icon(
-                  Icons.search_rounded,
-                  color: AppPalette.textMuted,
-                  size: 20,
-                ),
-                suffixIcon: state.search.isEmpty
-                    ? null
-                    : IconButton(
-                        tooltip: 'Clear search',
-                        icon: const Icon(Icons.close_rounded, size: 18),
-                        color: AppPalette.textMuted,
-                        onPressed: () {
-                          _controller.clear();
-                          widget.cubit.clearSearch();
-                        },
-                      ),
-                filled: true,
-                fillColor: AppPalette.surface,
-                contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppPalette.border),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(
-                    color: AppPalette.primary,
-                    width: 1.5,
-                  ),
-                ),
-              ),
+            child: AppSearchField(
+              value: state.search,
+              // Short: four controls share this row on a phone, so the
+              // field is narrow and a longer hint just clips.
+              hintText: 'Name or barcode',
+              onChanged: cubit.search,
+              onClear: cubit.clearSearch,
             ),
           ),
 
@@ -361,7 +299,20 @@ class _SearchBarState extends State<_SearchBar> {
             tooltip: 'Scan a barcode to find a product',
             icon: Icons.qr_code_scanner_rounded,
             isActive: false,
-            onTap: widget.onScan,
+            onTap: onScan,
+          ),
+
+          const SizedBox(width: 8),
+
+          // Compact: this is the busiest bar in the app — search,
+          // scan, sort and the inactive toggle all share one row, so
+          // the sort control gives its label back to the search field.
+          SortMenuButton<ProductSort>(
+            compact: true,
+            selected: state.sort,
+            items: ProductSort.values,
+            itemLabel: (sort) => sort.label,
+            onSelected: cubit.setSort,
           ),
 
           const SizedBox(width: 8),
@@ -377,7 +328,7 @@ class _SearchBarState extends State<_SearchBar> {
                 : Icons.visibility_off_outlined,
             isActive: state.includeInactive,
             onTap: () =>
-                widget.cubit.setIncludeInactive(!state.includeInactive),
+                cubit.setIncludeInactive(!state.includeInactive),
           ),
         ],
       ),

@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:utanglista_mobileapp/core/config/app_database.dart';
+import 'package:utanglista_mobileapp/core/constants/sort_options.dart';
 import 'package:utanglista_mobileapp/core/error/error_definition.dart';
 import 'package:utanglista_mobileapp/core/money/interest_rate.dart';
 import 'package:utanglista_mobileapp/core/money/money.dart';
@@ -24,6 +25,8 @@ abstract class InterestLocalDataSource {
     int storeId, {
     int? customerId,
     String? periodKey,
+    String? search,
+    InterestSort sort,
   });
 }
 
@@ -336,6 +339,8 @@ class InterestLocalDataSourceImplementation implements InterestLocalDataSource {
     int storeId, {
     int? customerId,
     String? periodKey,
+    String? search,
+    InterestSort sort = InterestSort.newestPeriod,
   }) async {
     try {
       final query = database.select(interestRecordsTable).join([
@@ -352,12 +357,39 @@ class InterestLocalDataSourceImplementation implements InterestLocalDataSource {
         query.where(interestRecordsTable.periodKey.equals(periodKey));
       }
 
-      // periodKey is 'YYYY-MM' and zero-padded, so it sorts
-      // chronologically as text — see AppDateFormat.periodKey.
-      query.orderBy([
-        OrderingTerm.desc(interestRecordsTable.periodKey),
-        OrderingTerm.desc(interestRecordsTable.id),
-      ]);
+      /*
+        Searches the charged customer's name only. A charge has no note
+        of its own — §21 records figures, not prose — so there is
+        nothing else here worth matching on.
+      */
+      final term = search?.trim() ?? '';
+      if (term.isNotEmpty) {
+        query.where(
+          customersTable.name.lower().like('%${term.toLowerCase()}%'),
+        );
+      }
+
+      /*
+        Ordered by the period a charge COVERS, not when it was written.
+        periodKey is zero-padded 'YYYY-MM', so it sorts chronologically
+        as text — see AppDateFormat.periodKey. §21 dates a charge to its
+        period deliberately; sorting by createdAt would put an August
+        charge applied in September among the September ones.
+      */
+      query.orderBy(switch (sort) {
+        InterestSort.newestPeriod => [
+          OrderingTerm.desc(interestRecordsTable.periodKey),
+          OrderingTerm.desc(interestRecordsTable.id),
+        ],
+        InterestSort.oldestPeriod => [
+          OrderingTerm.asc(interestRecordsTable.periodKey),
+          OrderingTerm.asc(interestRecordsTable.id),
+        ],
+        InterestSort.amountHighLow => [
+          OrderingTerm.desc(interestRecordsTable.interestAmount),
+          OrderingTerm.desc(interestRecordsTable.id),
+        ],
+      });
 
       final rows = await query.get();
 

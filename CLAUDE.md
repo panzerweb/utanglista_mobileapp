@@ -328,15 +328,16 @@ the one before it.
 | **5** | **Payments + Ledger** — record payment with overpayment guard, chronological customer ledger with running balance | §36 scenario reproduces exactly |
 | **6** | **Interest** — store settings (enable/disable, 0–5% rate), period-guarded application, interest history | Re-running application in the same month creates no duplicate record |
 | **7** | **Dashboard** — total receivables, top debtors, recent activity, per-store rollups | Dashboard reads only from the shared derived-balance path |
-| **8** | **Polish** — search, sorting, confirmation dialogs, empty/loading/error states everywhere, backup/export | — |
+| **8** | **Polish** — search and sort everywhere, confirmations on permanent writes, stepwise migrations, backup/restore | Search + sort on every list but the ledger; a version bump cannot wipe a ledger; a backup round-trips §36 exactly |
 
 ---
 
 ## 7. Status
 
-**Phases 0-7 are complete.** `flutter analyze` is clean and 255 tests pass. The
+**Phases 0-8 are complete.** `flutter analyze` is clean and 325 tests pass. The
 `transaction_logic.md` §36 worked example runs end to end — utang, payment, interest, and
-the ledger's running-balance column — alongside pure-arithmetic and raw-SQL versions.
+the ledger's running-balance column — alongside pure-arithmetic, raw-SQL, and
+export/wipe/restore versions.
 
 - **Phase 0** — schema corrections, `Money`, `CustomerBalance`, shared views, the scanner.
 - **Phase 1** — Stores tab, store form with optional interest, store detail tab shell.
@@ -346,6 +347,7 @@ the ledger's running-balance column — alongside pure-arithmetic and raw-SQL ve
 - **Phase 5** — Payments with the §23 guard, and the §17 ledger.
 - **Phase 6** — Interest preview, idempotent application, and history.
 - **Phase 7** — Dashboard: receivables, top debtors, recent activity, interest nudge.
+- **Phase 8** — Search and sort, confirmations, stepwise migrations, backup/restore.
 
 Rules established along the way that later phases must not relitigate:
 
@@ -368,7 +370,10 @@ Rules established along the way that later phases must not relitigate:
   deactivated customer can still *pay* — §29 stops new utang, not repayment — and is
   currently skipped by interest (see design_plan Phase 6; a documented judgment call).
 - **An update that changes no column of its own table must not report NOT_FOUND.**
-- **Any list with a search field needs a sequence guard**, not just a debounce.
+- **Any list with a search field needs a SEQUENCE guard** — not just a debounce, and not
+  an in-flight guard. A debounce reduces overlapping reads without ordering them; a
+  guard that skips loads while one is running silently drops keystrokes AND still lets
+  a slow query land after a newer one.
 - **A scanned barcode has three outcomes, not two:** found-active, found-inactive,
   not-found.
 - **Snapshot what a record was computed from.** `transaction_items.unitPrice` (§7) and
@@ -382,24 +387,55 @@ Rules established along the way that later phases must not relitigate:
   depend on it — a charge dated by wall clock falls outside the next month's cutoff and the
   compounding silently stops.
 - **Financial records are never edited or deleted** (§14, §30, §31). The absent actions are
-  the rule; the detail screens say so rather than just omitting a button.
+  the rule; the detail screens say so rather than just omitting a button — and the two
+  writes that create them now confirm first, naming the figures.
+- **Sorting is a QUERY concern.** A sort option is an enum in
+  `core/constants/sort_options.dart`, threaded datasource → repository → cubit into an
+  `OrderingTerm`. No widget sorts a list it was handed. The two options that cannot be SQL
+  — customer balance, store receivable — are ordered in the cubit that holds both the rows
+  and the §15 totals, over a deterministic base order, and say so at every site.
+- **Every ordering ends with an id tiebreaker, and the tiebreaker follows the sort's
+  DIRECTION.** Ascending time with descending ids returns same-second rows reversed.
+  Deactivated rows sort last whatever the user picked.
+- **The ledger is never searched, filtered or re-sorted.** A running balance is a fold over
+  the rows before it: filtering makes every balance below a hidden row wrong, and sorting
+  by size makes the column meaningless. The Utang and Payments tabs are the searchable
+  views, because neither carries a running total. Day and month headings likewise only
+  survive a chronological sort — by amount, those lists render flat.
+- **A version bump must never be able to wipe a ledger.** `core/config/migrations.dart` is
+  stepwise from the v5 baseline: one registered step per version, and a missing step, a
+  downgrade or a pre-release schema THROWS. Never add a `createAll` fallback — that is the
+  destructive upgrade returning through the side door. Adding a migration is a five-item
+  checklist in that file's header.
+- **A backup carries raw column values**, never formatted ones: centavos, not `₱52.50`;
+  unix seconds, not a locale date. It is read and written by generic `SELECT *` so a new
+  column cannot be silently dropped from every backup, and a guard catches a new TABLE.
+- **A restore is one transaction, replaces rather than merges, and preserves ids.** It is
+  validated in full before a single row is touched, and it raises `DataResetNotifier` so
+  the tabs living in the shell's `IndexedStack` re-read instead of showing money that no
+  longer exists.
 
-**Next: Phase 8 (Polish).** Search and sort on remaining lists, a formatting audit, and
-local backup/restore — still fully offline. Nothing structural is left.
+**The app is complete for V1.** Every section of `transaction_logic.md` that describes
+behaviour is implemented and tested, the schema can be changed without losing data, and a
+seller can get their ledger off the phone and back onto another one.
 
-**The app is functionally complete for V1.** Every section of `transaction_logic.md` that
-describes behaviour is implemented and tested.
+What is left before shipping is not code: rendering it on a real device. See "Still open".
 
-### Carried into later phases
+### Still open
 
-- **`StoreEntity.createdAt` is a preformatted `String`.** Fine while it is display-only,
-  but the ledger and dashboard sort chronologically. When transactions arrive in Phase 4,
-  entities that participate in the ledger must carry a real `DateTime` and format at the
-  widget layer.
 - **State classes have no value equality**, so every `emit` rebuilds even when nothing
   changed. Harmless now; worth revisiting if a list gets long enough to feel it.
-- **The migration is destructive through v5.** From the first release onward, `onUpgrade`
-  needs a real stepwise branch — see the comment in `app_database.dart`.
+- **drift's schema tooling is not adopted.** `drift_dev` is pinned to 2.34.0 by the Flutter
+  SDK's analyzer, and that version's `schema dump` is broken against drift 2.34.3. The
+  hand-written migration tests cover ordering, refusal and data survival, but NOT an
+  upgrade between real historical schemas. Run the commands in the `migrations.dart` header
+  once an SDK bump allows drift_dev 2.34.5+.
+- **Restoring a backup from an older schema is refused, not migrated.**
+  `_requireCompatibleSchema` in the backup repository is where that path goes when the
+  schema first moves past v5.
+- **Nothing has been rendered on a device.** No widget tests exist, and the scanner, share
+  sheet and file picker are verified only by building — every phase has carried this, and
+  it is now the largest untested surface in the project.
 
 ---
 
@@ -410,6 +446,8 @@ describes behaviour is implemented and tested.
 - When a business rule and existing code disagree, `transaction_logic.md` wins — raise it
   rather than quietly coding around it.
 - Do not add packages without asking. Current stack: `drift`, `drift_flutter`,
-  `flutter_bloc`, `get_it`, `go_router`, `google_fonts`, `intl`, `mobile_scanner`,
-  `path_provider`.
-- No network calls, no auth, no cloud. Ever.
+  `file_picker`, `flutter_bloc`, `get_it`, `go_router`, `google_fonts`, `intl`,
+  `mobile_scanner`, `path_provider`, `share_plus`.
+- No network calls, no auth, no cloud. Ever. The backup is not an exception: the app writes
+  a file and hands it to the OS share sheet, and the OS file picker hands one back. No
+  socket is opened and the destination is the user's choice, made outside the app.

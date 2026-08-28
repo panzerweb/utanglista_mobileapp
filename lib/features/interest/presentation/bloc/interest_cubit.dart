@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:utanglista_mobileapp/core/constants/sort_options.dart';
 import 'package:utanglista_mobileapp/core/error/error_definition.dart';
 import 'package:utanglista_mobileapp/core/money/interest_rate.dart';
 import 'package:utanglista_mobileapp/core/utils/app_date_format.dart';
@@ -205,6 +208,12 @@ class InterestHistoryState {
   final int? customerId;
   final List<InterestRecordEntity> records;
   final InterestHistoryStatus status;
+
+  /// Free-text search over the charged customer's name.
+  final String search;
+
+  final InterestSort sort;
+
   final AppFailure? error;
 
   const InterestHistoryState({
@@ -212,13 +221,32 @@ class InterestHistoryState {
     this.customerId,
     this.records = const [],
     this.status = InterestHistoryStatus.initial,
+    this.search = '',
+    this.sort = InterestSort.newestPeriod,
     this.error,
   });
 
   bool get isEmpty =>
       status == InterestHistoryStatus.success && records.isEmpty;
 
-  /// Records grouped by the month they charged, newest month first.
+  /// Empty because of the search, not because interest was never
+  /// charged in this store.
+  bool get isFilteredEmpty => isEmpty && search.isNotEmpty;
+
+  /*
+    Month headings only make sense while the list runs in month order.
+    Sorted by amount, the rows cross months freely, so the screen shows
+    a flat list rather than headings that repeat and jump.
+  */
+  bool get isGroupedByPeriod => sort != InterestSort.amountHighLow;
+
+  /*
+    Records grouped by the month they charged.
+
+    A LinkedHashMap in insertion order, so the group order follows
+    whatever the query returned — newest month first by default, oldest
+    first when the sort says so. Nothing re-sorts here.
+  */
   Map<String, List<InterestRecordEntity>> get byPeriod {
     final grouped = <String, List<InterestRecordEntity>>{};
 
@@ -232,6 +260,8 @@ class InterestHistoryState {
   InterestHistoryState copyWith({
     List<InterestRecordEntity>? records,
     InterestHistoryStatus? status,
+    String? search,
+    InterestSort? sort,
     Object? error = _unset,
   }) {
     return InterestHistoryState(
@@ -239,6 +269,8 @@ class InterestHistoryState {
       customerId: customerId,
       records: records ?? this.records,
       status: status ?? this.status,
+      search: search ?? this.search,
+      sort: sort ?? this.sort,
       error: identical(error, _unset) ? this.error : error as AppFailure?,
     );
   }
@@ -253,14 +285,32 @@ class InterestHistoryCubit extends Cubit<InterestHistoryState> {
     int? customerId,
   }) : super(InterestHistoryState(storeId: storeId, customerId: customerId));
 
+  /// Every load claims a ticket; only the newest may emit. See
+  /// CustomerListCubit for why the debounce is not enough on its own.
+  int _requestId = 0;
+
+  Timer? _debounce;
+
+  @override
+  Future<void> close() {
+    _debounce?.cancel();
+    return super.close();
+  }
+
   Future<void> loadRecords() async {
+    final int requestId = ++_requestId;
+
     emit(state.copyWith(status: InterestHistoryStatus.loading, error: null));
 
     try {
       final records = await repository.fetchRecords(
         state.storeId,
         customerId: state.customerId,
+        search: state.search,
+        sort: state.sort,
       );
+
+      if (requestId != _requestId) return;
 
       emit(
         state.copyWith(
@@ -270,8 +320,10 @@ class InterestHistoryCubit extends Cubit<InterestHistoryState> {
         ),
       );
     } on AppFailure catch (e) {
+      if (requestId != _requestId) return;
       emit(state.copyWith(error: e, status: InterestHistoryStatus.failure));
     } catch (e) {
+      if (requestId != _requestId) return;
       emit(
         state.copyWith(
           error: AppFailure(
@@ -282,5 +334,29 @@ class InterestHistoryCubit extends Cubit<InterestHistoryState> {
         ),
       );
     }
+  }
+
+  void search(String term) {
+    if (state.search == term) return;
+
+    emit(state.copyWith(search: term));
+
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 250), loadRecords);
+  }
+
+  Future<void> clearSearch() async {
+    if (state.search.isEmpty) return;
+
+    _debounce?.cancel();
+    emit(state.copyWith(search: ''));
+    await loadRecords();
+  }
+
+  Future<void> setSort(InterestSort sort) async {
+    if (state.sort == sort) return;
+
+    emit(state.copyWith(sort: sort));
+    await loadRecords();
   }
 }

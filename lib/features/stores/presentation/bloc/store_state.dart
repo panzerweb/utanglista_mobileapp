@@ -1,4 +1,5 @@
 import 'package:utanglista_mobileapp/core/constants/enum.dart';
+import 'package:utanglista_mobileapp/core/constants/sort_options.dart';
 import 'package:utanglista_mobileapp/core/error/error_definition.dart';
 import 'package:utanglista_mobileapp/core/money/money.dart';
 import 'package:utanglista_mobileapp/features/customers/domain/entities/customer_balance.dart';
@@ -47,6 +48,13 @@ class StoreListState {
 
   /// null means "All categories" — no filter applied.
   final StoreCategory? category;
+
+  /// Free-text search over the store name. '' means no search.
+  final String search;
+
+  /// How the list is ordered.
+  final StoreSort sort;
+
   final AppFailure? error;
 
   const StoreListState({
@@ -54,15 +62,19 @@ class StoreListState {
     this.balances = const {},
     this.status = StoreListStateStatus.initial,
     this.category,
+    this.search = '',
+    this.sort = StoreSort.recent,
     this.error,
   });
 
   bool get isEmpty =>
       status == StoreListStateStatus.success && stores.isEmpty;
 
-  /// True when the list is empty only because of the active filter —
-  /// the empty state should then offer to clear it, not to add a store.
-  bool get isFilteredEmpty => isEmpty && category != null;
+  /// True when the list is empty only because of the search or the
+  /// category filter — the empty state should then offer to clear
+  /// them, not to add a store.
+  bool get isFilteredEmpty =>
+      isEmpty && (category != null || search.isNotEmpty);
 
   CustomerBalance balanceFor(int storeId) =>
       balances[storeId] ?? CustomerBalance.zero;
@@ -83,6 +95,8 @@ class StoreListState {
     Map<int, CustomerBalance>? balances,
     StoreListStateStatus? status,
     Object? category = _unset,
+    String? search,
+    StoreSort? sort,
     Object? error = _unset,
   }) {
     return StoreListState(
@@ -92,6 +106,8 @@ class StoreListState {
       category: identical(category, _unset)
           ? this.category
           : category as StoreCategory?,
+      search: search ?? this.search,
+      sort: sort ?? this.sort,
       error: identical(error, _unset) ? this.error : error as AppFailure?,
     );
   }

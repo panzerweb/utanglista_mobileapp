@@ -1,12 +1,17 @@
 import 'package:drift/drift.dart';
 import 'package:utanglista_mobileapp/core/config/app_database.dart';
+import 'package:utanglista_mobileapp/core/constants/sort_options.dart';
 import 'package:utanglista_mobileapp/features/stores/data/model/store_model.dart';
 import 'package:utanglista_mobileapp/features/stores/data/model/store_payload_model.dart';
 
 abstract class StoreLocalDataSource {
   Future<int> createStore(StorePayloadModel payload);
   Future<StoreModel?> fetchStoreById(int storeId);
-  Future<List<StoreModel>> fetchStores(String? category);
+  Future<List<StoreModel>> fetchStores(
+    String? category, {
+    String? search,
+    StoreSort sort,
+  });
   Future<int> updateStore(UpdateStorePayloadModel updatePayload);
   Future<int> deleteStore(int storeId);
 }
@@ -99,9 +104,14 @@ class StoreLocalDataSourceImplementation implements StoreLocalDataSource {
     }
   }
 
-  /// [category] null means every category.
+  /// [category] null means every category. [search] matches the store
+  /// name, case-insensitively.
   @override
-  Future<List<StoreModel>> fetchStores(String? category) async {
+  Future<List<StoreModel>> fetchStores(
+    String? category, {
+    String? search,
+    StoreSort sort = StoreSort.recent,
+  }) async {
     try {
       final query = database.select(storesTable).join([
         leftOuterJoin(
@@ -114,9 +124,17 @@ class StoreLocalDataSourceImplementation implements StoreLocalDataSource {
         query.where(storesTable.category.equals(category));
       }
 
+      final term = search?.trim() ?? '';
+      if (term.isNotEmpty) {
+        // Both sides lowered: SQLite's LIKE is case-insensitive for
+        // ASCII only, so "niño" would not match "Niño". The term is a
+        // bound variable, never concatenated into the SQL.
+        query.where(storesTable.name.lower().like('%${term.toLowerCase()}%'));
+      }
+
       /*
-        Newest first: the store a user just created should be the one
-        they see, without scrolling.
+        Newest first by default: the store a user just created should be
+        the one they see, without scrolling.
 
         The id tiebreaker is not decoration. Drift stores DateTime as
         unix SECONDS, so two rows created in the same second compare
@@ -125,12 +143,21 @@ class StoreLocalDataSourceImplementation implements StoreLocalDataSource {
 
         Ordering by the autoincrement id second makes it deterministic,
         and id order is creation order. The ledger in Phase 5 merges
-        three tables by createdAt and will need the same treatment.
+        three tables by createdAt and needs the same treatment.
+
+        StoreSort.receivable is ordered by StoreListCubit instead — the
+        total is not a column here. The reasoning is on the enum.
       */
-      query.orderBy([
-        OrderingTerm.desc(storesTable.createdAt),
-        OrderingTerm.desc(storesTable.id),
-      ]);
+      query.orderBy(switch (sort) {
+        StoreSort.recent => [
+          OrderingTerm.desc(storesTable.createdAt),
+          OrderingTerm.desc(storesTable.id),
+        ],
+        StoreSort.name || StoreSort.receivable => [
+          OrderingTerm.asc(storesTable.name),
+          OrderingTerm.asc(storesTable.id),
+        ],
+      });
 
       final rows = await query.get();
 

@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:utanglista_mobileapp/core/extensions/store_category_extensions.dart';
 import 'package:utanglista_mobileapp/core/routes/routes.dart';
+import 'package:utanglista_mobileapp/core/services/data_reset_notifier.dart';
 import 'package:utanglista_mobileapp/core/services/service_locator.dart';
 import 'package:utanglista_mobileapp/core/shared/main_app_bar.dart';
 import 'package:utanglista_mobileapp/core/shared/views/app_error_view.dart';
@@ -37,7 +38,12 @@ class DashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (_) => locator<DashboardCubit>()..loadDashboard(),
-      child: const _DashboardView(),
+      // This tab sits in the shell's IndexedStack and is not rebuilt
+      // by navigation, so a restore has to tell it to read again.
+      child: DataResetListener(
+        onReset: (context) => context.read<DashboardCubit>().loadDashboard(),
+        child: const _DashboardView(),
+      ),
     );
   }
 }

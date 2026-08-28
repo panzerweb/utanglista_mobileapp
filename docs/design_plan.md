@@ -8,7 +8,7 @@ built, in what order, and which decisions are still open.
 
 ## 1. Where the codebase stands today
 
-*Updated at the end of Phase 7.*
+*Updated at the end of Phase 8.*
 
 | Area | Status |
 |---|---|
@@ -28,7 +28,9 @@ built, in what order, and which decisions are still open.
 | Dashboard read model + screen | ✅ Phase 7 |
 | Routing (all screens on go_router) | ✅ |
 | DI registrations | ✅ All slices wired |
-| Polish: sorting, backup/export | ⬜ Phase 8 |
+| Search + sort on every list | ✅ Phase 8 |
+| Stepwise migrations (destructive `onUpgrade` gone) | ✅ Phase 8 |
+| Backup / restore (versioned JSON) | ✅ Phase 8 |
 
 **The store slice is the reference implementation.** Every other feature is built by
 copying its shape.
@@ -588,14 +590,201 @@ would swamp the feed, and it is already visible on the store that charged it.
 
 **Not verified:** no widget tests.
 
-### Phase 8 — Polish
+### Phase 8 — Polish ✅ COMPLETE
 
-- Search and sort on every list
-- Confirmation dialogs on all destructive actions
-- Consistent empty / loading / error states
-- Currency and date formatting audit
-- Local backup / restore (export the SQLite file or a JSON dump) — still fully offline
-- Optional: PDF or text receipt for a transaction
+**Goal:** the parts that make a finished app rather than a working one.
+
+- [x] Search and sort on every list that should have them
+- [x] Confirmation on the two permanent writes that had none
+- [x] Empty / loading / error states audited across all 11 list surfaces
+- [x] Currency and date formatting audit
+- [x] **Stepwise migrations** — the destructive `onUpgrade` is gone
+- [x] Local backup / restore as a versioned JSON file — still fully offline
+
+**Done:** `flutter analyze` clean, 325/325 tests pass, debug APK builds.
+
+Two dependencies added, both platform plugins and neither of them networked:
+`share_plus` ^13.3.0 (the OS share sheet) and `file_picker` ^12.1.1 (the OS
+file picker).
+
+#### Sorting is a query concern
+
+`core/constants/sort_options.dart` holds one rich enum per list, in the same
+shape as `StoreCategory`. The chosen option is threaded
+datasource → repository → cubit and becomes an `OrderingTerm`; no widget sorts
+a list it was handed.
+
+Two options cannot be SQL, and both are documented at all three of their sites:
+a customer's balance and a store's receivable are the §15 aggregate over three
+financial tables, not a column. Those are ordered in the CUBIT — the layer that
+holds the rows and the totals — over a deterministic base order the datasource
+supplies.
+
+Every option keeps two rules: deactivated rows sort last whatever the user
+picked (§28, §29), and every ordering ends with an id tiebreaker. The
+tiebreaker follows the DIRECTION of the sort — an oldest-first list breaking
+ties by descending id hands back same-second rows reversed.
+
+#### Three things worth recording
+
+1. **The Stores cubit had an in-flight guard, not a sequence guard.** It
+   skipped a load while another ran, with a `force` flag for filter changes.
+   That is fine until a search field exists: most keystrokes get dropped and
+   the survivors can still finish out of order. Replaced with the ticket
+   pattern the other lists use, and `force` is gone from all four call sites.
+2. **Sorting by amount breaks grouping.** Transaction history groups under day
+   headings and interest history under month headings; ordered by size, those
+   headings repeat and jump backwards. Both lists render FLAT when sorted by
+   amount, and interest rows then carry their own period label because the
+   heading that used to say so is gone. Day headings also follow the sort
+   direction now.
+3. **`AppSearchField` was promoted to `core/shared/`** once a third list needed
+   one. Customers and Products were refactored onto it, which let both of their
+   search bars drop their controller lifecycle and become stateless.
+
+#### The Ledger deliberately has neither
+
+Every other list gained search and sort. The §17 ledger did not, and the reason
+is written into `ledger_tab.dart` rather than left as an unexplained omission:
+a running balance is a fold over the rows before it. Filter the list and every
+balance below a hidden row is wrong by that row's amount. Sort it by size and
+"balance after this event" stops meaning anything at all.
+
+A seller looking for one utang has the Utang tab; one payment, the Payments
+tab. Both are searchable, because neither carries a running total.
+
+#### Confirmation on the two permanent writes
+
+Recording a payment and committing an utang both went straight through. Both
+are permanent under §30/§31 and V1 has no reversal, so a payment against the
+wrong customer cannot be corrected — only offset by a second record that makes
+the ledger harder to read.
+
+Both now confirm, naming the figures a mis-tap actually gets wrong: the amount
+and the payer, or the customer and the total. The cart is already on screen, so
+the utang dialog does not re-list it.
+
+#### The formatting audit found nothing, which is the point
+
+Zero `toStringAsFixed` outside `core/money`, zero raw `DateFormat` outside
+`AppDateFormat`, zero `₱` literals outside `MoneyTextField` and comments. The
+`Money`-everywhere rule held on its own for seven phases.
+
+`StoreEntity.createdAt` was already a real `DateTime` — the note carried
+forward from Phase 1 was stale.
+
+---
+
+#### ⚠ Migrations: the destructive upgrade is gone
+
+`onUpgrade` dropped every table and recreated the schema. Acceptable exactly
+once — v5 converted the money columns from REAL pesos to INTEGER centavos while
+no real data existed. Shipping it would mean the first post-release schema
+change silently erasing every ledger on every device.
+
+`core/config/migrations.dart` replaces it. **v5 is the released baseline**, each
+later version registers one step keyed by the version it produces, and anything
+unaccounted for THROWS rather than guesses: a missing step, a downgrade, a
+pre-release schema. A database that refuses to open keeps its rows.
+
+The tempting fallback — "no step registered, just `createAll`" — is the
+destructive behaviour returning through the side door at the exact moment a
+developer forgot something, and on a user's device rather than in development.
+Hence the throw.
+
+**The proof is a test, not an assertion:** a real v5 file on disk holding a
+ledger, opened by a subclass whose `schemaVersion` is 6 with no step registered.
+It throws, and the ledger is still there and readable by the correct build
+afterwards.
+
+**drift's own schema tooling could not be adopted.** `drift_dev` is held at
+2.34.0 by the Flutter SDK's pinned analyzer, and 2.34.0's `schema dump` is
+broken against drift 2.34.3 — it resolves the drift3-preview
+`GeneratedDatabase`, which has no `allSchemaEntities`. The exact commands to run
+once an SDK bump unblocks drift_dev 2.34.5+ are in the header of
+`migrations.dart`. Adopt them then; they verify migrations between real
+historical schemas, which the hand-written tests cannot.
+
+---
+
+#### Backup and restore
+
+A JSON file, not a copy of the `.db`. It is self-describing, readable by a
+human deciding whether a file is worth restoring, and survives a schema change
+in a way an opaque binary does not.
+
+```json
+{ "app": "utanglista", "formatVersion": 1, "schemaVersion": 5,
+  "exportedAt": "...", "tables": { "stores_table": [ ... ], ... } }
+```
+
+**Two version numbers, moving independently.** `formatVersion` is the
+envelope's own shape; `schemaVersion` is the schema the rows came from. Adding
+a column bumps one and not the other.
+
+**Money is exported as raw centavos.** Never `52.5`, never `"₱52.50"` — §26
+forbids the float, and a formatted string would have to be parsed back through
+a locale-dependent currency format. Dates go out as the unix seconds drift
+stores. A backup carries what the DATABASE had, so a restore is a copy rather
+than a re-interpretation.
+
+**The datasource is generic SQL, deliberately.** `SELECT *` per table, written
+back from whatever column names came out. The obvious alternative — a
+serialiser per table — rots the moment someone adds a column: it is simply
+missing from every backup afterwards, nothing fails, and the bug surfaces
+months later on a restore as a column of nulls. A guard checks the write-order
+list against the real schema so a new TABLE cannot be forgotten either.
+
+**The whole restore is one `database.transaction { }`.** Deletes in reverse
+dependency order, inserts forward, foreign keys live throughout — SQLite
+ignores `PRAGMA foreign_keys` changes inside a transaction, so the ordering is
+load-bearing rather than tidy. A file that turns out to be damaged halfway
+through cannot leave a half-restored ledger, which would be worse than either
+outcome: numbers that look plausible and are wrong.
+
+**Ids are preserved.** Every foreign key in the file refers to them, and
+remapping eight tables' worth of references is the one operation here with a
+real chance of silently attaching a payment to the wrong customer.
+
+**Restore is two steps with the confirmation between them.** Read and describe,
+then apply. A single call would have to confirm before knowing the file is any
+good — asking someone to approve replacing their ledger with a file that turns
+out to be a photo — or confirm after writing, which is not a confirmation. The
+dialog names when the backup was made and what is in it: "3 stores, 41
+customers, 260 utang records".
+
+**Four decisions worth recording:**
+
+1. **Replace, never merge.** Two databases of the same shape both using
+   autoincrement ids cannot be merged without rewriting every foreign key, and
+   a merge that guessed wrong would corrupt a ledger rather than replace one.
+   The screen says so before the button is pressed, not only in the dialog.
+2. **An empty backup is refused.** Restoring one would delete everything and
+   put nothing back. If that is genuinely wanted, deleting the stores says so
+   out loud.
+3. **A schema mismatch is refused in both directions**, with a message saying
+   which way it runs. Migrating an older backup column by column is real work
+   whose bugs cost people their ledgers, so it is not being guessed at; when
+   the schema first moves past v5, `_requireCompatibleSchema` is where that
+   path goes.
+4. **A restore raises `DataResetNotifier`.** The Dashboard and Stores tabs live
+   in the shell's `IndexedStack` and are not rebuilt by navigating to Settings,
+   so without a signal they would keep showing a total receivable for
+   transactions that no longer exist. Keying the navigation shell would be
+   fewer lines but depends on how go_router treats a recreated element subtree,
+   which this project has no device to verify; `goBranch(initialLocation: true)`
+   only resets a branch's navigation stack and would not rebuild a branch
+   already at its root. An explicit signal is more code and is obvious.
+
+**Still fully offline.** Export writes to the app's cache directory and hands
+the path to the OS share sheet; import reads what the OS file picker returns.
+No socket is opened, and where the file goes is a choice the user makes in a
+dialog this app cannot see the result of.
+
+**Not verified:** no widget tests, and neither the share sheet nor the file
+picker has been exercised on a physical device — only their build and API
+compatibility. The 24 backup tests cover the repository and below, which is
+where the data-loss risk lives.
 
 ---
 

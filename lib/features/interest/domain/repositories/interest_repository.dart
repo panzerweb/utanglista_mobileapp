@@ -1,3 +1,4 @@
+import 'package:utanglista_mobileapp/core/constants/sort_options.dart';
 import 'package:utanglista_mobileapp/core/error/error_definition.dart';
 import 'package:utanglista_mobileapp/core/helper/repository_guard.dart';
 import 'package:utanglista_mobileapp/core/money/interest_rate.dart';
@@ -22,6 +23,8 @@ abstract class InterestRepository {
     int storeId, {
     int? customerId,
     String? periodKey,
+    String? search,
+    InterestSort sort,
   });
 }
 
@@ -81,12 +84,16 @@ class InterestRepositoryImplementation implements InterestRepository {
     int storeId, {
     int? customerId,
     String? periodKey,
+    String? search,
+    InterestSort sort = InterestSort.newestPeriod,
   }) {
     return repositoryGuard(
       () => localDataSource.fetchRecords(
         storeId,
         customerId: customerId,
         periodKey: periodKey,
+        search: search,
+        sort: sort,
       ),
       failureMessage: "Could not load interest history.",
     );

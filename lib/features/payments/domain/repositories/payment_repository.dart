@@ -1,3 +1,4 @@
+import 'package:utanglista_mobileapp/core/constants/sort_options.dart';
 import 'package:utanglista_mobileapp/core/helper/repository_guard.dart';
 import 'package:utanglista_mobileapp/features/payments/data/datasource/payment_local_data_source.dart';
 import 'package:utanglista_mobileapp/features/payments/data/model/payment_model.dart';
@@ -25,6 +26,8 @@ abstract class PaymentRepository {
     int storeId, {
     int? customerId,
     int? limit,
+    String? search,
+    PaymentSort sort,
   });
 }
 
@@ -57,12 +60,16 @@ class PaymentRepositoryImplementation implements PaymentRepository {
     int storeId, {
     int? customerId,
     int? limit,
+    String? search,
+    PaymentSort sort = PaymentSort.recent,
   }) {
     return repositoryGuard(() async {
       final models = await localDataSource.fetchPayments(
         storeId,
         customerId: customerId,
         limit: limit,
+        search: search,
+        sort: sort,
       );
 
       return models.map((model) => model.toEntity()).toList();

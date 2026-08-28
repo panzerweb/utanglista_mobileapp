@@ -1,6 +1,7 @@
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:utanglista_mobileapp/core/config/app_database.dart';
+import 'package:utanglista_mobileapp/core/constants/sort_options.dart';
 import 'package:utanglista_mobileapp/core/constants/enum.dart';
 import 'package:utanglista_mobileapp/core/money/interest_rate.dart';
 import 'package:utanglista_mobileapp/features/stores/data/datasource/store_local_data_source.dart';
@@ -89,6 +90,111 @@ void main() {
     });
 
     tearDown(() async => db.close());
+
+    /*
+      Search and sort on the store list. The receivable option is NOT
+      here: it is ordered by StoreListCubit from balances the query
+      never sees, so the datasource is only asked for a deterministic
+      base — which is what 'falls back to name order' below asserts.
+    */
+    group('search and sort', () {
+      Future<int> addStore(String name) =>
+          repository.createStore(StorePayloadModel(name: name));
+
+      Future<List<String>> names({
+        String? search,
+        StoreSort sort = StoreSort.recent,
+      }) async {
+        final stores = await repository.fetchStores(
+          null,
+          search: search,
+          sort: sort,
+        );
+
+        return stores.map((s) => s.name).toList();
+      }
+
+      test('search matches part of a name, case-insensitively', () async {
+        await addStore('Aling Nena Store');
+        await addStore('Fishball Cart');
+
+        expect(await names(search: 'nena'), ['Aling Nena Store']);
+        expect(await names(search: 'NENA'), ['Aling Nena Store']);
+        expect(await names(search: 'cart'), ['Fishball Cart']);
+      });
+
+      test('a blank search returns everything', () async {
+        await addStore('Aling Nena Store');
+        await addStore('Fishball Cart');
+
+        expect(await names(search: ''), hasLength(2));
+        expect(await names(search: '   '), hasLength(2));
+        expect(await names(), hasLength(2));
+      });
+
+      test('no match returns empty, not everything', () async {
+        await addStore('Aling Nena Store');
+
+        expect(await names(search: 'sari-sari'), isEmpty);
+      });
+
+      /*
+        Everything is created inside one unix second, so newest-first
+        rests entirely on the id tiebreaker — the Phase 1 bug this
+        column ordering was added to fix.
+      */
+      test('defaults to newest first', () async {
+        await addStore('First');
+        await addStore('Second');
+        await addStore('Third');
+
+        expect(await names(), ['Third', 'Second', 'First']);
+      });
+
+      test('by name, A-Z', () async {
+        await addStore('Zapote Store');
+        await addStore('Aling Nena Store');
+        await addStore('Manila Sari-sari');
+
+        expect(await names(sort: StoreSort.name), [
+          'Aling Nena Store',
+          'Manila Sari-sari',
+          'Zapote Store',
+        ]);
+      });
+
+      test('sorting by receivable falls back to name order in SQL', () async {
+        await addStore('Zapote Store');
+        await addStore('Aling Nena Store');
+
+        // The cubit re-sorts by the totals it loaded separately; all the
+        // datasource owes it is the same answer every time.
+        expect(await names(sort: StoreSort.receivable), [
+          'Aling Nena Store',
+          'Zapote Store',
+        ]);
+        expect(await names(sort: StoreSort.receivable), [
+          'Aling Nena Store',
+          'Zapote Store',
+        ]);
+      });
+
+      test('search and category filter apply together', () async {
+        await repository.createStore(
+          StorePayloadModel(name: 'Nena Retail', category: StoreCategory.retail),
+        );
+        await repository.createStore(
+          StorePayloadModel(name: 'Nena Street', category: StoreCategory.street),
+        );
+
+        final retail = await repository.fetchStores(
+          StoreCategory.retail.value,
+          search: 'nena',
+        );
+
+        expect(retail.map((s) => s.name), ['Nena Retail']);
+      });
+    });
 
     test('creating a store creates its settings row too', () async {
       final id = await repository.createStore(

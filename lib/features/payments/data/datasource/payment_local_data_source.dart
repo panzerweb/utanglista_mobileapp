@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:utanglista_mobileapp/core/config/app_database.dart';
+import 'package:utanglista_mobileapp/core/constants/sort_options.dart';
 import 'package:utanglista_mobileapp/core/error/error_definition.dart';
 import 'package:utanglista_mobileapp/core/money/money.dart';
 import 'package:utanglista_mobileapp/features/payments/data/model/payment_model.dart';
@@ -11,6 +12,8 @@ abstract class PaymentLocalDataSource {
     int storeId, {
     int? customerId,
     int? limit,
+    String? search,
+    PaymentSort sort,
   });
 }
 
@@ -152,6 +155,8 @@ class PaymentLocalDataSourceImplementation implements PaymentLocalDataSource {
     int storeId, {
     int? customerId,
     int? limit,
+    String? search,
+    PaymentSort sort = PaymentSort.recent,
   }) async {
     try {
       final query = database.select(paymentsTable).join([
@@ -165,12 +170,41 @@ class PaymentLocalDataSourceImplementation implements PaymentLocalDataSource {
         query.where(paymentsTable.customerId.equals(customerId));
       }
 
-      // The id tiebreaker again: drift stores DateTime as unix seconds,
-      // and two payments in one minute is ordinary.
-      query.orderBy([
-        OrderingTerm.desc(paymentsTable.createdAt),
-        OrderingTerm.desc(paymentsTable.id),
-      ]);
+      /*
+        Searches the payer's name and the payment's note — "bayad ni
+        Juan" and "partial" are the two things a seller remembers. The
+        customer table is already joined for the name.
+      */
+      final term = search?.trim() ?? '';
+      if (term.isNotEmpty) {
+        final pattern = '%${term.toLowerCase()}%';
+
+        query.where(
+          customersTable.name.lower().like(pattern) |
+              paymentsTable.note.lower().like(pattern),
+        );
+      }
+
+      /*
+        The id tiebreaker again: drift stores DateTime as unix seconds,
+        and two payments in one minute is ordinary. It follows the
+        direction of the sort — oldest-first breaking ties by descending
+        id would reverse same-second pairs.
+      */
+      query.orderBy(switch (sort) {
+        PaymentSort.recent => [
+          OrderingTerm.desc(paymentsTable.createdAt),
+          OrderingTerm.desc(paymentsTable.id),
+        ],
+        PaymentSort.oldest => [
+          OrderingTerm.asc(paymentsTable.createdAt),
+          OrderingTerm.asc(paymentsTable.id),
+        ],
+        PaymentSort.amountHighLow => [
+          OrderingTerm.desc(paymentsTable.amount),
+          OrderingTerm.desc(paymentsTable.id),
+        ],
+      });
 
       if (limit != null) query.limit(limit);
 

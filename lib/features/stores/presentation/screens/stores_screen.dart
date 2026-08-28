@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:utanglista_mobileapp/core/constants/sort_options.dart';
 import 'package:utanglista_mobileapp/core/routes/routes.dart';
+import 'package:utanglista_mobileapp/core/services/data_reset_notifier.dart';
 import 'package:utanglista_mobileapp/core/services/service_locator.dart';
 import 'package:utanglista_mobileapp/core/shared/main_app_bar.dart';
+import 'package:utanglista_mobileapp/core/shared/sort_menu_button.dart';
+import 'package:utanglista_mobileapp/core/shared/textfield/app_search_field.dart';
 import 'package:utanglista_mobileapp/core/shared/views/app_error_view.dart';
 import 'package:utanglista_mobileapp/core/shared/views/app_loading_view.dart';
 import 'package:utanglista_mobileapp/core/shared/views/empty_state_view.dart';
@@ -32,7 +36,13 @@ class StoresScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (_) => locator<StoreListCubit>()..loadAllStores(),
-      child: const _StoresView(),
+      // Same reason as the dashboard: this tab survives in the shell's
+      // IndexedStack, so a restore reaches it through the notifier
+      // rather than through navigation.
+      child: DataResetListener(
+        onReset: (context) => context.read<StoreListCubit>().loadAllStores(),
+        child: const _StoresView(),
+      ),
     );
   }
 }
@@ -46,7 +56,7 @@ class _StoresView extends StatelessWidget {
     await context.push(AppRoutes.storeDetail(storeId));
 
     // The store may have been renamed or deleted while it was open.
-    if (context.mounted) await cubit.loadAllStores(force: true);
+    if (context.mounted) await cubit.loadAllStores();
   }
 
   Future<void> _createStore(BuildContext context) async {
@@ -54,7 +64,7 @@ class _StoresView extends StatelessWidget {
 
     await context.push(AppRoutes.newStore);
 
-    if (context.mounted) await cubit.loadAllStores(force: true);
+    if (context.mounted) await cubit.loadAllStores();
   }
 
   @override
@@ -75,8 +85,15 @@ class _StoresView extends StatelessWidget {
 
           return Column(
             children: [
-              const SizedBox(height: 12),
+              _SearchAndSortBar(state: state, cubit: cubit),
 
+              /*
+                Search and category are separate controls on purpose.
+                Category is a coarse, sticky choice the seller leaves
+                set; search is typed and thrown away. Folding one into
+                the other would mean clearing a search to change
+                category, or losing the category by typing.
+              */
               CategoryFilterBar(
                 selected: state.category,
                 onSelected: cubit.setFilter,
@@ -97,21 +114,42 @@ class _StoresView extends StatelessWidget {
     StoreListState state,
     StoreListCubit cubit,
   ) {
-    // Only blank the list on the FIRST load. A filter change or a
-    // refresh keeps the previous rows on screen underneath, which reads
-    // as the list updating rather than the screen restarting.
-    if (state.status == StoreListStateStatus.loading && state.stores.isEmpty) {
+    // Only blank the list on the FIRST load. A filter change, a search
+    // or a refresh keeps the previous rows on screen underneath, which
+    // reads as the list updating rather than the screen restarting.
+    if (state.status == StoreListStateStatus.loading &&
+        state.stores.isEmpty &&
+        state.search.isEmpty) {
       return const AppLoadingView(message: 'Loading stores...');
     }
 
     if (state.status == StoreListStateStatus.failure && state.error != null) {
       return AppErrorView(
         failure: state.error!,
-        onRetry: () => cubit.loadAllStores(force: true),
+        onRetry: () => cubit.loadAllStores(),
       );
     }
 
+    /*
+      Two ways to end up with an empty filtered list, and they need
+      different offers. Telling someone to "show all stores" when what
+      they actually did was mistype a name sends them to the wrong
+      control.
+    */
     if (state.isFilteredEmpty) {
+      if (state.search.isNotEmpty) {
+        return EmptyStateView(
+          icon: Icons.search_off_rounded,
+          title: 'No stores found',
+          message: state.category == null
+              ? 'Nothing matches "${state.search}".'
+              : 'Nothing matches "${state.search}" under '
+                    '${state.category!.label.toLowerCase()}.',
+          actionLabel: 'Clear search',
+          onAction: cubit.clearSearch,
+        );
+      }
+
       return EmptyStateView(
         icon: Icons.filter_alt_off_outlined,
         title: 'No ${state.category?.label.toLowerCase()} stores',
@@ -137,7 +175,7 @@ class _StoresView extends StatelessWidget {
 
     return RefreshIndicator(
       color: AppPalette.primary,
-      onRefresh: () => cubit.loadAllStores(force: true),
+      onRefresh: () => cubit.loadAllStores(),
       child: ListView.builder(
         // Always scrollable, so pull-to-refresh works even when the
         // list is short enough to fit.
@@ -227,6 +265,49 @@ class _TotalSummary extends StatelessWidget {
               Icons.account_balance_wallet_rounded,
               color: AppPalette.surface,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================
+// SEARCH + SORT
+// ============================================================
+/*
+  Sits above the category chips rather than beside them: three
+  controls on one row would leave the search field too narrow to read
+  a store name in, and the chips already own a full row.
+*/
+class _SearchAndSortBar extends StatelessWidget {
+  final StoreListState state;
+  final StoreListCubit cubit;
+
+  const _SearchAndSortBar({required this.state, required this.cubit});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: AppSearchField(
+              value: state.search,
+              hintText: 'Search stores',
+              onChanged: cubit.search,
+              onClear: cubit.clearSearch,
+            ),
+          ),
+
+          const SizedBox(width: 8),
+
+          SortMenuButton<StoreSort>(
+            selected: state.sort,
+            items: StoreSort.values,
+            itemLabel: (sort) => sort.label,
+            onSelected: cubit.setSort,
           ),
         ],
       ),

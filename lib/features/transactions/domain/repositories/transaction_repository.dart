@@ -1,3 +1,4 @@
+import 'package:utanglista_mobileapp/core/constants/sort_options.dart';
 import 'package:utanglista_mobileapp/core/error/error_definition.dart';
 import 'package:utanglista_mobileapp/core/helper/repository_guard.dart';
 import 'package:utanglista_mobileapp/features/transactions/data/datasource/transaction_local_data_source.dart';
@@ -11,6 +12,8 @@ abstract class TransactionRepository {
     int storeId, {
     int? customerId,
     int? limit,
+    String? search,
+    TransactionSort sort,
   });
 }
 
@@ -67,12 +70,16 @@ class TransactionRepositoryImplementation implements TransactionRepository {
     int storeId, {
     int? customerId,
     int? limit,
+    String? search,
+    TransactionSort sort = TransactionSort.recent,
   }) {
     return repositoryGuard(() async {
       final models = await localDataSource.fetchTransactions(
         storeId,
         customerId: customerId,
         limit: limit,
+        search: search,
+        sort: sort,
       );
 
       return models.map((model) => model.toEntity()).toList();

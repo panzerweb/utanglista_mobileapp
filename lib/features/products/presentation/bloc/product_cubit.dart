@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:utanglista_mobileapp/core/constants/sort_options.dart';
 import 'package:utanglista_mobileapp/core/error/error_definition.dart';
 import 'package:utanglista_mobileapp/core/money/money.dart';
 import 'package:utanglista_mobileapp/features/products/data/model/product_payload_model.dart';
@@ -110,6 +111,7 @@ class ProductListCubit extends Cubit<ProductListState> {
         state.storeId,
         search: state.search,
         includeInactive: state.includeInactive,
+        sort: state.sort,
       );
 
       if (requestId != _requestId) return;
@@ -159,6 +161,16 @@ class ProductListCubit extends Cubit<ProductListState> {
     if (state.includeInactive == includeInactive) return;
 
     emit(state.copyWith(includeInactive: includeInactive));
+    await loadProducts();
+  }
+
+  /// Every product sort is an ORDER BY in the datasource, so this only
+  /// has to reload — unlike the customer list, whose balance option
+  /// has to be ordered in the cubit.
+  Future<void> setSort(ProductSort sort) async {
+    if (state.sort == sort) return;
+
+    emit(state.copyWith(sort: sort));
     await loadProducts();
   }
 }

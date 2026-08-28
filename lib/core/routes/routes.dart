@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:utanglista_mobileapp/core/money/interest_rate.dart';
 import 'package:utanglista_mobileapp/core/shared/app_view.dart';
 import 'package:utanglista_mobileapp/core/shared/scanner/barcode_scanner_screen.dart';
+import 'package:utanglista_mobileapp/features/backup/presentation/screens/settings_screen.dart';
 import 'package:utanglista_mobileapp/features/customers/presentation/screens/customer_detail_screen.dart';
 import 'package:utanglista_mobileapp/features/customers/presentation/screens/customer_form_screen.dart';
 import 'package:utanglista_mobileapp/features/dashboard/presentation/screens/dashboard_screen.dart';
@@ -481,9 +482,7 @@ final router = GoRouter(
           routes: [
             GoRoute(
               path: AppRoutes.settings,
-              builder: (context, state) {
-                return Center(child: Text("Settings"));
-              },
+              builder: (context, state) => const SettingsScreen(),
             ),
           ],
         ),

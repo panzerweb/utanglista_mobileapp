@@ -1,3 +1,4 @@
+import 'package:utanglista_mobileapp/core/constants/sort_options.dart';
 import 'package:utanglista_mobileapp/core/error/error_definition.dart';
 import 'package:utanglista_mobileapp/features/products/domain/entities/product_entity.dart';
 
@@ -21,6 +22,10 @@ class ProductListState {
   /// §28: deactivated products are hidden by default but never gone.
   final bool includeInactive;
 
+  /// How the catalogue is ordered. Deactivated products sort last
+  /// regardless — see the note on [ProductSort].
+  final ProductSort sort;
+
   final AppFailure? error;
 
   const ProductListState({
@@ -29,6 +34,7 @@ class ProductListState {
     this.status = ProductListStateStatus.initial,
     this.search = '',
     this.includeInactive = false,
+    this.sort = ProductSort.name,
     this.error,
   });
 
@@ -48,6 +54,7 @@ class ProductListState {
     ProductListStateStatus? status,
     String? search,
     bool? includeInactive,
+    ProductSort? sort,
     Object? error = _unset,
   }) {
     return ProductListState(
@@ -56,6 +63,7 @@ class ProductListState {
       status: status ?? this.status,
       search: search ?? this.search,
       includeInactive: includeInactive ?? this.includeInactive,
+      sort: sort ?? this.sort,
       error: identical(error, _unset) ? this.error : error as AppFailure?,
     );
   }

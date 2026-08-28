@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:utanglista_mobileapp/core/constants/sort_options.dart';
 import 'package:utanglista_mobileapp/core/error/error_definition.dart';
 import 'package:utanglista_mobileapp/core/money/money.dart';
 import 'package:utanglista_mobileapp/features/customers/domain/entities/customer_balance.dart';
@@ -21,6 +24,12 @@ class PaymentListState {
   final int? customerId;
   final List<PaymentEntity> payments;
   final PaymentListStateStatus status;
+
+  /// Free-text search over the payer's name and the note.
+  final String search;
+
+  final PaymentSort sort;
+
   final AppFailure? error;
 
   const PaymentListState({
@@ -28,11 +37,16 @@ class PaymentListState {
     this.customerId,
     this.payments = const [],
     this.status = PaymentListStateStatus.initial,
+    this.search = '',
+    this.sort = PaymentSort.recent,
     this.error,
   });
 
   bool get isEmpty =>
       status == PaymentListStateStatus.success && payments.isEmpty;
+
+  /// Empty because of the search, not because nobody has ever paid.
+  bool get isFilteredEmpty => isEmpty && search.isNotEmpty;
 
   Money get totalReceived =>
       payments.map((payment) => payment.amount).sum();
@@ -40,6 +54,8 @@ class PaymentListState {
   PaymentListState copyWith({
     List<PaymentEntity>? payments,
     PaymentListStateStatus? status,
+    String? search,
+    PaymentSort? sort,
     Object? error = _unset,
   }) {
     return PaymentListState(
@@ -47,6 +63,8 @@ class PaymentListState {
       customerId: customerId,
       payments: payments ?? this.payments,
       status: status ?? this.status,
+      search: search ?? this.search,
+      sort: sort ?? this.sort,
       error: identical(error, _unset) ? this.error : error as AppFailure?,
     );
   }
@@ -58,14 +76,33 @@ class PaymentListCubit extends Cubit<PaymentListState> {
   PaymentListCubit(this.repository, {required int storeId, int? customerId})
     : super(PaymentListState(storeId: storeId, customerId: customerId));
 
+  /// Every load claims a ticket; only the newest may emit. The long
+  /// version of why is on CustomerListCubit — a debounce alone still
+  /// lets a slow query land after a newer one.
+  int _requestId = 0;
+
+  Timer? _debounce;
+
+  @override
+  Future<void> close() {
+    _debounce?.cancel();
+    return super.close();
+  }
+
   Future<void> loadPayments() async {
+    final int requestId = ++_requestId;
+
     emit(state.copyWith(error: null, status: PaymentListStateStatus.loading));
 
     try {
       final payments = await repository.fetchPayments(
         state.storeId,
         customerId: state.customerId,
+        search: state.search,
+        sort: state.sort,
       );
+
+      if (requestId != _requestId) return;
 
       emit(
         state.copyWith(
@@ -75,8 +112,10 @@ class PaymentListCubit extends Cubit<PaymentListState> {
         ),
       );
     } on AppFailure catch (e) {
+      if (requestId != _requestId) return;
       emit(state.copyWith(error: e, status: PaymentListStateStatus.failure));
     } catch (e) {
+      if (requestId != _requestId) return;
       emit(
         state.copyWith(
           error: AppFailure(
@@ -87,6 +126,30 @@ class PaymentListCubit extends Cubit<PaymentListState> {
         ),
       );
     }
+  }
+
+  void search(String term) {
+    if (state.search == term) return;
+
+    emit(state.copyWith(search: term));
+
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 250), loadPayments);
+  }
+
+  Future<void> clearSearch() async {
+    if (state.search.isEmpty) return;
+
+    _debounce?.cancel();
+    emit(state.copyWith(search: ''));
+    await loadPayments();
+  }
+
+  Future<void> setSort(PaymentSort sort) async {
+    if (state.sort == sort) return;
+
+    emit(state.copyWith(sort: sort));
+    await loadPayments();
   }
 }
 

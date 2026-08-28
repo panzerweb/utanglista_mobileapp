@@ -1,3 +1,4 @@
+import 'package:utanglista_mobileapp/core/constants/sort_options.dart';
 import 'package:utanglista_mobileapp/core/error/error_definition.dart';
 import 'package:utanglista_mobileapp/core/helper/repository_guard.dart';
 import 'package:utanglista_mobileapp/features/products/data/datasource/product_local_data_source.dart';
@@ -12,6 +13,7 @@ abstract class ProductRepository {
     int storeId, {
     String? search,
     bool includeInactive,
+    ProductSort sort,
   });
   Future<int> updateProduct(UpdateProductPayloadModel updatePayload);
   Future<int> setActive(int productId, {required bool isActive});
@@ -73,12 +75,14 @@ class ProductRepositoryImplementation implements ProductRepository {
     int storeId, {
     String? search,
     bool includeInactive = true,
+    ProductSort sort = ProductSort.name,
   }) {
     return repositoryGuard(() async {
       final models = await localDataSource.fetchProducts(
         storeId,
         search: search,
         includeInactive: includeInactive,
+        sort: sort,
       );
 
       return models.map((model) => model.toEntity()).toList();

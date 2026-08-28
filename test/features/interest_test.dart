@@ -1,6 +1,7 @@
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:utanglista_mobileapp/core/config/app_database.dart';
+import 'package:utanglista_mobileapp/core/constants/sort_options.dart';
 import 'package:utanglista_mobileapp/core/error/error_definition.dart';
 import 'package:utanglista_mobileapp/core/money/interest_rate.dart';
 import 'package:utanglista_mobileapp/core/money/money.dart';
@@ -603,6 +604,97 @@ void main() {
   });
 
   // ======================================================================
+  group('history search and sort', () {
+    /// Charges July and August for one customer, so the history has
+    /// two periods to order.
+    Future<void> chargeTwoMonths(int customerId) async {
+      await apply(periodKey: july);
+      await apply(periodKey: august);
+    }
+
+    test('search matches the charged customer', () async {
+      final juan = await addCustomer('Juan');
+      final maria = await addCustomer('Maria Santos');
+      await oweFromJune(juan, Money.fromPesos(1000));
+      await oweFromJune(maria, Money.fromPesos(2000));
+
+      await apply();
+
+      final found = await interest.fetchRecords(storeId, search: 'maria');
+
+      expect(found, hasLength(1));
+      expect(found.single.customerName, 'Maria Santos');
+    });
+
+    test('no match returns empty, not every charge', () async {
+      final juan = await addCustomer('Juan');
+      await oweFromJune(juan, Money.fromPesos(1000));
+      await apply();
+
+      expect(await interest.fetchRecords(storeId, search: 'pedro'), isEmpty);
+    });
+
+    /*
+      Ordered by the period a charge COVERS. Both charges below are
+      WRITTEN in the same instant — only their periodKey separates
+      them, which is exactly what §21's period dating is for.
+    */
+    test('oldest-period is the reverse of newest-period', () async {
+      final juan = await addCustomer('Juan');
+      await oweFromJune(juan, Money.fromPesos(1000));
+
+      await chargeTwoMonths(juan);
+
+      final newest = await interest.fetchRecords(storeId);
+      final oldest = await interest.fetchRecords(
+        storeId,
+        sort: InterestSort.oldestPeriod,
+      );
+
+      expect(newest.map((r) => r.periodKey), [august, july]);
+      expect(oldest.map((r) => r.periodKey), [july, august]);
+    });
+
+    test('by largest charge, across months', () async {
+      final juan = await addCustomer('Juan');
+      await oweFromJune(juan, Money.fromPesos(1000));
+
+      // Interest compounds, so August charges more than July.
+      await chargeTwoMonths(juan);
+
+      final byAmount = await interest.fetchRecords(
+        storeId,
+        sort: InterestSort.amountHighLow,
+      );
+
+      expect(byAmount, hasLength(2));
+      expect(
+        byAmount.first.interestAmount >= byAmount.last.interestAmount,
+        isTrue,
+      );
+      expect(byAmount.first.periodKey, august);
+    });
+
+    test('a period filter and a search apply together', () async {
+      final juan = await addCustomer('Juan');
+      final maria = await addCustomer('Maria');
+      await oweFromJune(juan, Money.fromPesos(1000));
+      await oweFromJune(maria, Money.fromPesos(2000));
+
+      await apply(periodKey: july);
+      await apply(periodKey: august);
+
+      final found = await interest.fetchRecords(
+        storeId,
+        periodKey: july,
+        search: 'maria',
+      );
+
+      expect(found, hasLength(1));
+      expect(found.single.periodKey, july);
+    });
+  });
+
   group('rate validation (§19)', () {
     test('rejects a rate above 5%', () async {
       final juan = await addCustomer('Juan');

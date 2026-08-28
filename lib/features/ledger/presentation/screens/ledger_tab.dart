@@ -29,6 +29,25 @@ import 'package:utanglista_mobileapp/features/ledger/presentation/bloc/ledger_cu
   Every row is a projection of an immutable record (§14, §30), so
   there is nothing to edit here. Tapping an utang opens its
   transaction; payments and interest have no deeper detail.
+
+  ------------------------------------------------------------------
+  NO SEARCH, NO SORT — and that is deliberate.
+  ------------------------------------------------------------------
+
+  Every other list in the app gained both in Phase 8. This one did
+  not, because the running balance in the right-hand column is only
+  correct in one order.
+
+  A running balance is a fold over the rows BEFORE it. Filter the list
+  and every balance below the hidden row is wrong by the amount of
+  that row — the screen would show ₱559.00 for a customer who owes
+  ₱400.00, with nothing on it to say why. Re-sort the list and the
+  column stops meaning anything at all: "balance after this event" has
+  no reading when the events are ordered by size.
+
+  A seller who wants to find one utang has the Utang tab; one payment,
+  the Payments tab. Both ARE searchable and sortable, because neither
+  carries a running total.
 */
 class LedgerTab extends StatelessWidget {
   final int storeId;

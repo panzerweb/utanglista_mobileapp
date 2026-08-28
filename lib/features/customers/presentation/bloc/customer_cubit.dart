@@ -1,9 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:utanglista_mobileapp/core/constants/sort_options.dart';
 import 'package:utanglista_mobileapp/core/error/error_definition.dart';
 import 'package:utanglista_mobileapp/features/customers/data/model/customer_payload_model.dart';
 import 'package:utanglista_mobileapp/features/customers/domain/entities/customer_balance.dart';
+import 'package:utanglista_mobileapp/features/customers/domain/entities/customer_entity.dart';
 import 'package:utanglista_mobileapp/features/customers/domain/repositories/customer_balance_repository.dart';
 import 'package:utanglista_mobileapp/features/customers/domain/repositories/customer_repository.dart';
 import 'package:utanglista_mobileapp/features/customers/presentation/bloc/customer_state.dart';
@@ -103,6 +105,7 @@ class CustomerListCubit extends Cubit<CustomerListState> {
         state.storeId,
         search: state.search,
         includeInactive: state.includeInactive,
+        sort: state.sort,
       );
 
       /*
@@ -119,7 +122,7 @@ class CustomerListCubit extends Cubit<CustomerListState> {
 
       emit(
         state.copyWith(
-          customers: customers,
+          customers: _applyBalanceSort(customers, balances),
           balances: balances,
           status: CustomerListStateStatus.success,
           error: null,
@@ -170,6 +173,56 @@ class CustomerListCubit extends Cubit<CustomerListState> {
 
     emit(state.copyWith(includeInactive: includeInactive));
     await loadCustomers();
+  }
+
+  Future<void> setSort(CustomerSort sort) async {
+    if (state.sort == sort) return;
+
+    emit(state.copyWith(sort: sort));
+    await loadCustomers();
+  }
+
+  /*
+    ------------------------------------------------------------------
+    The one sort the database cannot do.
+    ------------------------------------------------------------------
+
+    Every other option is an ORDER BY in the datasource. Balance is not
+    a column on customers_table — it is the §15 aggregate over three
+    financial tables, loaded separately and batched. Sorting it in SQL
+    would mean joining that aggregate into the customer query and
+    maintaining the formula in a second place, which is the one thing
+    CLAUDE.md §7 forbids.
+
+    So it is ordered here, in the layer that holds both halves. This is
+    not a widget sorting its own data: the screen still receives a list
+    that is already in its final order.
+
+    Deactivated customers stay last whatever they owe (§29), and the id
+    breaks ties so two people owing the same amount do not reshuffle.
+  */
+  List<CustomerEntity> _applyBalanceSort(
+    List<CustomerEntity> customers,
+    Map<int, CustomerBalance> balances,
+  ) {
+    if (state.sort != CustomerSort.balance) return customers;
+
+    CustomerBalance balanceOf(CustomerEntity c) =>
+        balances[c.id] ?? CustomerBalance.zero;
+
+    final sorted = [...customers];
+
+    sorted.sort((a, b) {
+      if (a.isActive != b.isActive) return a.isActive ? -1 : 1;
+
+      final byBalance = balanceOf(
+        b,
+      ).outstanding.compareTo(balanceOf(a).outstanding);
+
+      return byBalance != 0 ? byBalance : a.id.compareTo(b.id);
+    });
+
+    return sorted;
   }
 
   CustomerBalance balanceOf(int customerId) => state.balanceFor(customerId);

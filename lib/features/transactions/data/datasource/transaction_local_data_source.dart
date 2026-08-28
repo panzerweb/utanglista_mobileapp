@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:utanglista_mobileapp/core/config/app_database.dart';
+import 'package:utanglista_mobileapp/core/constants/sort_options.dart';
 import 'package:utanglista_mobileapp/core/error/error_definition.dart';
 import 'package:utanglista_mobileapp/core/money/money.dart';
 import 'package:utanglista_mobileapp/features/transactions/data/model/transaction_model.dart';
@@ -12,6 +13,8 @@ abstract class TransactionLocalDataSource {
     int storeId, {
     int? customerId,
     int? limit,
+    String? search,
+    TransactionSort sort,
   });
 }
 
@@ -214,6 +217,8 @@ class TransactionLocalDataSourceImplementation
     int storeId, {
     int? customerId,
     int? limit,
+    String? search,
+    TransactionSort sort = TransactionSort.recent,
   }) async {
     try {
       final query = database.select(transactionsTable).join([
@@ -228,16 +233,52 @@ class TransactionLocalDataSourceImplementation
       }
 
       /*
+        Searches the CUSTOMER's name and the transaction's note — the
+        two things a seller remembers about an utang they are trying to
+        find. The customer table is already joined for the name, so this
+        costs no extra query.
+
+        Item names are deliberately NOT searched. A history row does not
+        carry its items (see above), so matching on them would mean
+        joining every line of every transaction — the exact fan-out this
+        query was shaped to avoid.
+      */
+      final term = search?.trim() ?? '';
+      if (term.isNotEmpty) {
+        // Both sides lowered: SQLite's LIKE is ASCII-only for case.
+        final pattern = '%${term.toLowerCase()}%';
+
+        query.where(
+          customersTable.name.lower().like(pattern) |
+              transactionsTable.note.lower().like(pattern),
+        );
+      }
+
+      /*
         The id tiebreaker is not optional here. Drift stores DateTime as
         unix SECONDS, and a seller recording three utangs in one minute
         is ordinary — without it those rows would reshuffle between
         loads, and the Phase 5 ledger built on this would show a running
         balance that changes order for no reason.
+
+        The tiebreaker follows the direction of the sort: oldest-first
+        must break its ties by ASCENDING id, or two utangs in the same
+        second come back in the reverse of the order they were written.
       */
-      query.orderBy([
-        OrderingTerm.desc(transactionsTable.createdAt),
-        OrderingTerm.desc(transactionsTable.id),
-      ]);
+      query.orderBy(switch (sort) {
+        TransactionSort.recent => [
+          OrderingTerm.desc(transactionsTable.createdAt),
+          OrderingTerm.desc(transactionsTable.id),
+        ],
+        TransactionSort.oldest => [
+          OrderingTerm.asc(transactionsTable.createdAt),
+          OrderingTerm.asc(transactionsTable.id),
+        ],
+        TransactionSort.amountHighLow => [
+          OrderingTerm.desc(transactionsTable.totalAmount),
+          OrderingTerm.desc(transactionsTable.id),
+        ],
+      });
 
       if (limit != null) query.limit(limit);
 

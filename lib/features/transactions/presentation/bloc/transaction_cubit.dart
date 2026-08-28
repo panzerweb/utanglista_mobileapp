@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:utanglista_mobileapp/core/constants/sort_options.dart';
 import 'package:utanglista_mobileapp/core/error/error_definition.dart';
 import 'package:utanglista_mobileapp/features/customers/domain/entities/customer_entity.dart';
 import 'package:utanglista_mobileapp/features/products/domain/entities/product_entity.dart';
@@ -23,7 +26,22 @@ class TransactionListCubit extends Cubit<TransactionListState> {
          TransactionListState(storeId: storeId, customerId: customerId),
        );
 
+  /// Every load claims a ticket; only the newest may emit. The long
+  /// version of why is on CustomerListCubit — a debounce alone still
+  /// lets a slow query land after a newer one.
+  int _requestId = 0;
+
+  Timer? _debounce;
+
+  @override
+  Future<void> close() {
+    _debounce?.cancel();
+    return super.close();
+  }
+
   Future<void> loadTransactions() async {
+    final int requestId = ++_requestId;
+
     emit(
       state.copyWith(error: null, status: TransactionListStateStatus.loading),
     );
@@ -32,7 +50,11 @@ class TransactionListCubit extends Cubit<TransactionListState> {
       final transactions = await repository.fetchTransactions(
         state.storeId,
         customerId: state.customerId,
+        search: state.search,
+        sort: state.sort,
       );
+
+      if (requestId != _requestId) return;
 
       emit(
         state.copyWith(
@@ -42,10 +64,12 @@ class TransactionListCubit extends Cubit<TransactionListState> {
         ),
       );
     } on AppFailure catch (e) {
+      if (requestId != _requestId) return;
       emit(
         state.copyWith(error: e, status: TransactionListStateStatus.failure),
       );
     } catch (e) {
+      if (requestId != _requestId) return;
       emit(
         state.copyWith(
           error: AppFailure(
@@ -56,6 +80,30 @@ class TransactionListCubit extends Cubit<TransactionListState> {
         ),
       );
     }
+  }
+
+  void search(String term) {
+    if (state.search == term) return;
+
+    emit(state.copyWith(search: term));
+
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 250), loadTransactions);
+  }
+
+  Future<void> clearSearch() async {
+    if (state.search.isEmpty) return;
+
+    _debounce?.cancel();
+    emit(state.copyWith(search: ''));
+    await loadTransactions();
+  }
+
+  Future<void> setSort(TransactionSort sort) async {
+    if (state.sort == sort) return;
+
+    emit(state.copyWith(sort: sort));
+    await loadTransactions();
   }
 }
 

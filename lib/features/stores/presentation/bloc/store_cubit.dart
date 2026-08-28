@@ -1,10 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:utanglista_mobileapp/core/constants/enum.dart';
+import 'package:utanglista_mobileapp/core/constants/sort_options.dart';
 import 'package:utanglista_mobileapp/core/error/error_definition.dart';
 import 'package:utanglista_mobileapp/core/money/interest_rate.dart';
+import 'package:utanglista_mobileapp/core/money/money.dart';
 import 'package:utanglista_mobileapp/features/customers/domain/entities/customer_balance.dart';
 import 'package:utanglista_mobileapp/features/customers/domain/repositories/customer_balance_repository.dart';
 import 'package:utanglista_mobileapp/features/stores/data/model/store_payload_model.dart';
+import 'package:utanglista_mobileapp/features/stores/domain/entities/store_entity.dart';
 import 'package:utanglista_mobileapp/features/stores/domain/repositories/store_repository.dart';
 import 'package:utanglista_mobileapp/features/stores/presentation/bloc/store_state.dart';
 
@@ -67,19 +72,45 @@ class StoreListCubit extends Cubit<StoreListState> {
     : super(const StoreListState());
 
   /*
-    [force] bypasses the in-flight guard. A plain refresh should not
-    stack duplicate reads, but a filter change must never be swallowed
-    just because a load happened to be running — the user would tap
-    "Retail" and see nothing happen.
+    ------------------------------------------------------------------
+    Why an in-flight guard was replaced by a sequence counter.
+    ------------------------------------------------------------------
+
+    This list used to skip a load while another was running, with a
+    [force] flag for filter changes that had to get through. That works
+    while loads are rare. It breaks the moment a search field exists:
+    every keystroke starts a read, the guard drops most of them, and
+    the ones that do run can still finish out of order — a slow query
+    for "al" landing after "aling" leaves the list showing results for
+    a search the user has moved past.
+
+    So the store list now uses the same ticket the customer and product
+    lists use: every load claims one, and only the newest may emit.
+    Nothing is dropped, nothing lands late, and [force] is no longer a
+    thing a caller has to remember.
   */
-  Future<void> loadAllStores({bool force = false}) async {
-    if (!force && state.status == StoreListStateStatus.loading) return;
+  int _requestId = 0;
+
+  Timer? _debounce;
+
+  @override
+  Future<void> close() {
+    _debounce?.cancel();
+    return super.close();
+  }
+
+  Future<void> loadAllStores() async {
+    final int requestId = ++_requestId;
 
     // error: null actually clears now — see the sentinel in store_state.
     emit(state.copyWith(error: null, status: StoreListStateStatus.loading));
 
     try {
-      final stores = await repository.fetchStores(state.category?.value);
+      final stores = await repository.fetchStores(
+        state.category?.value,
+        search: state.search,
+        sort: state.sort,
+      );
 
       /*
         One balance query per store rather than one per customer. Still
@@ -95,17 +126,23 @@ class StoreListCubit extends Cubit<StoreListState> {
         );
       }
 
+      // A newer search or filter has started; its result is the one
+      // that counts.
+      if (requestId != _requestId) return;
+
       emit(
         state.copyWith(
-          stores: stores,
+          stores: _applyReceivableSort(stores, balances),
           balances: balances,
           status: StoreListStateStatus.success,
           error: null,
         ),
       );
     } on AppFailure catch (e) {
+      if (requestId != _requestId) return;
       emit(state.copyWith(error: e, status: StoreListStateStatus.failure));
     } catch (e) {
+      if (requestId != _requestId) return;
       emit(
         state.copyWith(
           error: AppFailure(
@@ -116,6 +153,62 @@ class StoreListCubit extends Cubit<StoreListState> {
         ),
       );
     }
+  }
+
+  /*
+    Debounced so a query does not run on every keystroke. The sequence
+    counter still guards the result — debouncing reduces the races, it
+    does not remove them.
+  */
+  void search(String term) {
+    if (state.search == term) return;
+
+    emit(state.copyWith(search: term));
+
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 250), loadAllStores);
+  }
+
+  Future<void> clearSearch() async {
+    if (state.search.isEmpty) return;
+
+    _debounce?.cancel();
+    emit(state.copyWith(search: ''));
+    await loadAllStores();
+  }
+
+  Future<void> setSort(StoreSort sort) async {
+    if (state.sort == sort) return;
+
+    emit(state.copyWith(sort: sort));
+    await loadAllStores();
+  }
+
+  /*
+    The receivable is the §15 aggregate across a store's customers, not
+    a column on stores_table — the same situation as sorting customers
+    by balance, one level up. It is ordered here because this is the
+    layer holding both the stores and their totals; the datasource gave
+    the page a deterministic name order to start from.
+  */
+  List<StoreEntity> _applyReceivableSort(
+    List<StoreEntity> stores,
+    Map<int, CustomerBalance> balances,
+  ) {
+    if (state.sort != StoreSort.receivable) return stores;
+
+    Money owedBy(StoreEntity store) =>
+        (balances[store.id] ?? CustomerBalance.zero).outstanding;
+
+    final sorted = [...stores];
+
+    sorted.sort((a, b) {
+      final byReceivable = owedBy(b).compareTo(owedBy(a));
+
+      return byReceivable != 0 ? byReceivable : a.id.compareTo(b.id);
+    });
+
+    return sorted;
   }
 
   /*
@@ -131,7 +224,7 @@ class StoreListCubit extends Cubit<StoreListState> {
 
     emit(state.copyWith(stores: const [], category: category));
 
-    await loadAllStores(force: true);
+    await loadAllStores();
   }
 }
 

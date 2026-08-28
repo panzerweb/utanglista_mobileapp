@@ -1,5 +1,8 @@
 import 'package:get_it/get_it.dart';
 import 'package:utanglista_mobileapp/core/config/app_database.dart';
+import 'package:utanglista_mobileapp/features/backup/data/datasource/backup_local_data_source.dart';
+import 'package:utanglista_mobileapp/features/backup/domain/repositories/backup_repository.dart';
+import 'package:utanglista_mobileapp/features/backup/presentation/bloc/backup_cubit.dart';
 import 'package:utanglista_mobileapp/features/customers/data/datasource/customer_balance_local_data_source.dart';
 import 'package:utanglista_mobileapp/features/customers/data/datasource/customer_local_data_source.dart';
 import 'package:utanglista_mobileapp/features/customers/domain/repositories/customer_balance_repository.dart';
@@ -298,6 +301,23 @@ void setupLocator() {
 
   locator.registerFactory<DashboardCubit>(
     () => DashboardCubit(locator<DashboardRepository>()),
+  );
+
+  // ========================================================
+  // ** BACKUP **
+  // Spans every table rather than one slice, so it depends on the
+  // database directly rather than on the other repositories.
+  // ========================================================
+  locator.registerLazySingleton<BackupLocalDataSource>(
+    () => BackupLocalDataSourceImplementation(locator<AppDatabase>()),
+  );
+
+  locator.registerLazySingleton<BackupRepository>(
+    () => BackupRepositoryImplementation(locator<BackupLocalDataSource>()),
+  );
+
+  locator.registerFactory<BackupCubit>(
+    () => BackupCubit(locator<BackupRepository>()),
   );
 
   /*

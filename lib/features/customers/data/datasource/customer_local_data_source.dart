@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:utanglista_mobileapp/core/config/app_database.dart';
+import 'package:utanglista_mobileapp/core/constants/sort_options.dart';
 import 'package:utanglista_mobileapp/features/customers/data/model/customer_model.dart';
 import 'package:utanglista_mobileapp/features/customers/data/model/customer_payload_model.dart';
 
@@ -10,6 +11,7 @@ abstract class CustomerLocalDataSource {
     int storeId, {
     String? search,
     bool includeInactive,
+    CustomerSort sort,
   });
   Future<int> updateCustomer(UpdateCustomerPayloadModel updatePayload);
   Future<int> deleteCustomer(int customerId);
@@ -76,6 +78,7 @@ class CustomerLocalDataSourceImplementation implements CustomerLocalDataSource {
     int storeId, {
     String? search,
     bool includeInactive = true,
+    CustomerSort sort = CustomerSort.recent,
   }) async {
     try {
       final query = database.select(customersTable)
@@ -105,14 +108,28 @@ class CustomerLocalDataSourceImplementation implements CustomerLocalDataSource {
       }
 
       /*
-        Active first, then newest. The id tiebreaker matters because
-        drift stores DateTime as unix SECONDS — customers added in the
-        same second would otherwise reshuffle between loads.
+        Active first whatever the sort (§29), then the chosen key, then
+        the id. The id tiebreaker matters because drift stores DateTime
+        as unix SECONDS — customers added in the same second would
+        otherwise reshuffle between loads.
+
+        CustomerSort.balance has no column to sort on here; it orders
+        by name so the page is deterministic, and CustomerListCubit
+        re-sorts by outstanding once the batched balances arrive. The
+        reasoning is on the enum.
       */
       query.orderBy([
         (tbl) => OrderingTerm.desc(tbl.isActive),
-        (tbl) => OrderingTerm.desc(tbl.createdAt),
-        (tbl) => OrderingTerm.desc(tbl.id),
+        ...switch (sort) {
+          CustomerSort.recent => [
+            (customersTable) => OrderingTerm.desc(customersTable.createdAt),
+            (customersTable) => OrderingTerm.desc(customersTable.id),
+          ],
+          CustomerSort.name || CustomerSort.balance => [
+            (customersTable) => OrderingTerm.asc(customersTable.name),
+            (customersTable) => OrderingTerm.asc(customersTable.id),
+          ],
+        },
       ]);
 
       final rows = await query.get();

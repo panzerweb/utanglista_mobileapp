@@ -1,3 +1,4 @@
+import 'package:utanglista_mobileapp/core/constants/sort_options.dart';
 import 'package:utanglista_mobileapp/core/error/error_definition.dart';
 import 'package:utanglista_mobileapp/core/money/money.dart';
 import 'package:utanglista_mobileapp/features/customers/domain/entities/customer_balance.dart';
@@ -33,6 +34,10 @@ class CustomerListState {
   /// §29: deactivated customers are hidden by default but never gone.
   final bool includeInactive;
 
+  /// How the list is ordered. Deactivated customers sort last
+  /// regardless — see the note on [CustomerSort].
+  final CustomerSort sort;
+
   final AppFailure? error;
 
   const CustomerListState({
@@ -42,6 +47,7 @@ class CustomerListState {
     this.status = CustomerListStateStatus.initial,
     this.search = '',
     this.includeInactive = false,
+    this.sort = CustomerSort.recent,
     this.error,
   });
 
@@ -70,6 +76,7 @@ class CustomerListState {
     CustomerListStateStatus? status,
     String? search,
     bool? includeInactive,
+    CustomerSort? sort,
     Object? error = _unset,
   }) {
     return CustomerListState(
@@ -79,6 +86,7 @@ class CustomerListState {
       status: status ?? this.status,
       search: search ?? this.search,
       includeInactive: includeInactive ?? this.includeInactive,
+      sort: sort ?? this.sort,
       error: identical(error, _unset) ? this.error : error as AppFailure?,
     );
   }

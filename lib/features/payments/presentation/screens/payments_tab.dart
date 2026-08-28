@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:utanglista_mobileapp/core/constants/sort_options.dart';
 import 'package:utanglista_mobileapp/core/services/service_locator.dart';
+import 'package:utanglista_mobileapp/core/shared/sort_menu_button.dart';
+import 'package:utanglista_mobileapp/core/shared/textfield/app_search_field.dart';
 import 'package:utanglista_mobileapp/core/shared/views/app_error_view.dart';
 import 'package:utanglista_mobileapp/core/shared/views/app_loading_view.dart';
 import 'package:utanglista_mobileapp/core/shared/views/empty_state_view.dart';
@@ -45,45 +48,118 @@ class _PaymentsView extends StatelessWidget {
       builder: (context, state) {
         final cubit = context.read<PaymentListCubit>();
 
-        if (state.status == PaymentListStateStatus.loading &&
-            state.payments.isEmpty) {
-          return const AppLoadingView(message: 'Loading payments...');
-        }
-
-        if (state.status == PaymentListStateStatus.failure &&
-            state.error != null) {
-          return AppErrorView(
-            failure: state.error!,
-            onRetry: cubit.loadPayments,
-          );
-        }
-
-        if (state.isEmpty) {
-          return const EmptyStateView(
-            icon: Icons.payments_outlined,
-            title: 'No payments yet',
-            message: 'Money received will be listed here.',
-          );
-        }
-
-        return RefreshIndicator(
-          color: AppPalette.primary,
-          onRefresh: cubit.loadPayments,
-          child: ListView.builder(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
-            itemCount: state.payments.length + 1,
-            itemBuilder: (context, index) {
-              if (index == 0) return _TotalReceived(state: state);
-
-              return _PaymentCard(
-                payment: state.payments[index - 1],
-                showCustomerName: showCustomerName,
-              );
-            },
-          ),
+        return Column(
+          children: [
+            _SearchAndSortBar(
+              state: state,
+              cubit: cubit,
+              // On a customer's own Payments tab every row is that
+              // person already, so only the note is worth searching.
+              searchesCustomerName: showCustomerName,
+            ),
+            Expanded(child: _buildBody(context, state, cubit)),
+          ],
         );
       },
+    );
+  }
+
+  Widget _buildBody(
+    BuildContext context,
+    PaymentListState state,
+    PaymentListCubit cubit,
+  ) {
+    // Only blank on the first load; a search keeps the rows underneath.
+    if (state.status == PaymentListStateStatus.loading &&
+        state.payments.isEmpty &&
+        state.search.isEmpty) {
+      return const AppLoadingView(message: 'Loading payments...');
+    }
+
+    if (state.status == PaymentListStateStatus.failure &&
+        state.error != null) {
+      return AppErrorView(failure: state.error!, onRetry: cubit.loadPayments);
+    }
+
+    if (state.isFilteredEmpty) {
+      return EmptyStateView(
+        icon: Icons.search_off_rounded,
+        title: 'No payments found',
+        message: 'Nothing matches "${state.search}".',
+        actionLabel: 'Clear search',
+        onAction: cubit.clearSearch,
+      );
+    }
+
+    if (state.isEmpty) {
+      return const EmptyStateView(
+        icon: Icons.payments_outlined,
+        title: 'No payments yet',
+        message: 'Money received will be listed here.',
+      );
+    }
+
+    return RefreshIndicator(
+      color: AppPalette.primary,
+      onRefresh: cubit.loadPayments,
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
+        itemCount: state.payments.length + 1,
+        itemBuilder: (context, index) {
+          if (index == 0) return _TotalReceived(state: state);
+
+          return _PaymentCard(
+            payment: state.payments[index - 1],
+            showCustomerName: showCustomerName,
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ============================================================
+// SEARCH + SORT
+// ============================================================
+class _SearchAndSortBar extends StatelessWidget {
+  final PaymentListState state;
+  final PaymentListCubit cubit;
+  final bool searchesCustomerName;
+
+  const _SearchAndSortBar({
+    required this.state,
+    required this.cubit,
+    required this.searchesCustomerName,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      color: AppPalette.background,
+      child: Row(
+        children: [
+          Expanded(
+            child: AppSearchField(
+              value: state.search,
+              hintText: searchesCustomerName ? 'Payer or note' : 'Note',
+              onChanged: cubit.search,
+              onClear: cubit.clearSearch,
+            ),
+          ),
+
+          const SizedBox(width: 8),
+
+          SortMenuButton<PaymentSort>(
+            compact: true,
+            selected: state.sort,
+            items: PaymentSort.values,
+            itemLabel: (sort) => sort.label,
+            onSelected: cubit.setSort,
+          ),
+        ],
+      ),
     );
   }
 }
