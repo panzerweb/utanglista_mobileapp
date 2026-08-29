@@ -28,15 +28,28 @@ jobs:
 
       # Rebuild the keystore from a base64 secret, plus the properties
       # file that build.gradle.kts reads it through.
+      #
+      # storeFile resolves through rootProject.file(), which is android/,
+      # so the path here must be app/upload-keystore.jks — matching the
+      # local key.properties.
       - name: Restore keystore
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/upload-keystore.jks
           cat > android/key.properties <<EOF
-          storeFile=upload-keystore.jks
+          storeFile=app/upload-keystore.jks
           storePassword=${{ secrets.KEYSTORE_PASSWORD }}
           keyAlias=${{ secrets.KEY_ALIAS }}
           keyPassword=${{ secrets.KEY_PASSWORD }}
           EOF
+
+      # Fails in seconds if the decode or the path is wrong, instead of
+      # seven minutes into the Gradle build.
+      - name: Verify keystore
+        run: |
+          ls -la android/app/upload-keystore.jks
+          keytool -list -keystore android/app/upload-keystore.jks \
+            -storepass "${{ secrets.KEYSTORE_PASSWORD }}" \
+            -alias "${{ secrets.KEY_ALIAS }}"
 
       - run: flutter pub get
 
@@ -45,16 +58,10 @@ jobs:
       - run: flutter test
 
       - name: Build APK
-        run: flutter build apk --release --split-per-abi
-
-      # Optional: also produce the .aab if you ever go to Play Store.
-      # - run: flutter build appbundle --release
+        run: flutter build apk --release
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
-          files: |
-            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
-            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
-            build/app/outputs/flutter-apk/app-x86_64-release.apk
+          files: build/app/outputs/flutter-apk/app-release.apk
