@@ -1,4 +1,4 @@
-package com.example.utanglista_mobileapp
+package ph.utanglista.app
 
 import io.flutter.embedding.android.FlutterActivity
 
