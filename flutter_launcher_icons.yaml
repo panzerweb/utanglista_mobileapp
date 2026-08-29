@@ -1,0 +1,12 @@
+flutter_launcher_icons:
+  image_path: "assets/UtangLista-Icon-1024.png"
+
+  android: true
+  min_sdk_android: 21
+  adaptive_icon_background: "#176B45"
+  adaptive_icon_foreground: "assets/UtangLista-Adaptive-Foreground.png"
+  adaptive_icon_monochrome: "assets/UtangLista-Monochrome.png"
+
+  ios: true
+  remove_alpha_ios: true
+  background_color_ios: "#176B45"
