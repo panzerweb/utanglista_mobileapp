@@ -8,7 +8,6 @@ import 'package:utanglista_mobileapp/core/styles/app_palette.dart';
 import 'package:utanglista_mobileapp/core/styles/app_text_styles.dart';
 import 'package:utanglista_mobileapp/features/customers/domain/entities/customer_entity.dart';
 import 'package:utanglista_mobileapp/features/customers/domain/repositories/customer_repository.dart';
-import 'package:utanglista_mobileapp/features/stores/presentation/bloc/store_cubit.dart';
 import 'package:utanglista_mobileapp/features/transactions/domain/entities/transaction_draft.dart';
 import 'package:utanglista_mobileapp/features/transactions/presentation/bloc/transaction_cubit.dart';
 import 'package:utanglista_mobileapp/features/transactions/presentation/bloc/transaction_state.dart';
